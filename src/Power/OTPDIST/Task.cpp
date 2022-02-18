@@ -429,7 +429,20 @@ namespace Power
       consume(const IMC::QueryPowerChannelState* msg)
       {
         (void)msg;
-        dispatchPowerChannelStates();
+        IMC::PowerChannelState msg_pcs;
+        for(int i = 0; i < c_max_channels; i++)
+        {
+          if (m_args.channels_names[i].find(c_nc_channels) == std::string::npos && m_args.channels_names[i].find(c_inv_channels) == std::string::npos)
+          {
+            if(m_args.channels_states[i])
+              msg_pcs.state = IMC::PowerChannelState::PCS_ON;
+            else
+              msg_pcs.state = IMC::PowerChannelState::PCS_OFF;
+
+            msg_pcs.name = m_args.channels_names[i];
+            dispatch(msg_pcs);
+          }
+        }
       }
 
       void
@@ -479,32 +492,6 @@ namespace Power
         spew("name: %s", msg->name.c_str());
         spew("op %d", msg->op);
         spew("time: %f", msg->sched_time);
-      }
-
-      void
-      dispatchPowerChannelStates(void)
-      {
-        IMC::PowerChannelState msg;
-        for(int i = 0; i < c_max_channels; i++)
-        {
-          if (m_args.channels_names[i].find(c_nc_channels) == std::string::npos)
-          {
-            if(m_args.channels_states[i])
-            {
-              msg.name = m_args.channels_names[i];
-              msg.state = IMC::PowerChannelState::PCS_ON;
-              if (m_args.channels_names[i].find(c_inv_channels) == std::string::npos)
-                dispatch(msg);
-            }
-            else
-            {
-              msg.name = m_args.channels_names[i];
-              msg.state = IMC::PowerChannelState::PCS_OFF;
-              if (m_args.channels_names[i].find(c_inv_channels) == std::string::npos)
-                dispatch(msg);
-            }
-          }
-        }
       }
 
       void
