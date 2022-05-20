@@ -43,6 +43,9 @@ namespace Control
     {
       using DUNE_NAMESPACES;
 
+      //! Required control loops
+      static const uint32_t c_required = IMC::CL_SPEED | IMC::CL_YAW | IMC::CL_PITCH;
+
       struct Task: public DUNE::Tasks::Task
       {
         double v, w;
@@ -50,10 +53,19 @@ namespace Control
         IMC::DesiredHeading m_heading;
         IMC::DesiredPitch m_pitch;
         IMC::DesiredSpeed m_speed;
+        IMC::ControlLoops m_cloops;
         bool has_valid_reference;
-        double theta_prev;
         //! Control loops last reference
         uint32_t m_scope_ref;
+        //! Active loops
+        uint32_t m_aloops;
+        //! Integrated z-error
+        double e_z_i;
+        //! Current depth
+        double z;
+        //! Previous depth
+        double z_prev;
+        Delta m_last_step;
 
         //! Constructor.
         //! @param[in] name task name.
@@ -69,7 +81,6 @@ namespace Control
           bind<IMC::DesiredLinearState>(this);
           bind<IMC::ControlLoops>(this);
           has_valid_reference = false;
-          theta_prev = NAN;
         }
 
         void
@@ -77,6 +88,16 @@ namespace Control
         {
           setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_ACTIVE);
           reset();
+
+          // Activate control loops
+          if ((c_required & m_aloops) == c_required)
+            return;
+
+          m_aloops |= c_required;
+          m_cloops.enable = IMC::ControlLoops::CL_ENABLE;
+          m_cloops.mask = c_required;
+          m_cloops.scope_ref = m_scope_ref;
+          dispatch(m_cloops);
         }
 
         void
@@ -84,6 +105,16 @@ namespace Control
         {
           setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_IDLE);
           reset();
+
+          // Deactivate control loops
+          if ((c_required & ~m_aloops) == c_required)
+            return;
+
+          m_aloops &= ~c_required;
+          m_cloops.enable = IMC::ControlLoops::CL_DISABLE;
+          m_cloops.mask = c_required;
+          m_cloops.scope_ref = m_scope_ref;
+          dispatch(m_cloops);
         }
 
         void
@@ -98,7 +129,10 @@ namespace Control
         reset(void)
         {
           has_valid_reference = false;
-          theta_prev = NAN;
+
+          e_z_i = 0.;
+          z = 0.;
+          z_prev = 0.;
         }
 
         void
@@ -108,6 +142,8 @@ namespace Control
           {
             v = msg->v;
             w = -msg->w;
+            z_prev = z;
+            z = msg->z;
             dispatch_references();
           }
         }
@@ -140,6 +176,10 @@ namespace Control
             return;
 
           m_scope_ref = msg->scope_ref;
+          if (msg->enable)
+            m_aloops |= msg->mask;
+          else
+            m_aloops &= ~msg->mask;
 
           if (isActive() == msg->enable)
             return;
@@ -156,10 +196,11 @@ namespace Control
           if (!has_valid_reference)
             return;
 
-          debug("Received desired velocity: vx = %f, vy = %f, vz = %f", vx, vy, vz);
-          debug("Lateral velocities: v = %f, w = %f", v, w);
+          //debug("Received desired velocity: vx = %f, vy = %f, vz = %f", vx, vy, vz);
+          //debug("Lateral velocities: v = %f, w = %f", v, w);
 
-          double k_theta_filter = 0.9;
+          double time_step = m_last_step.getDelta();
+          const double K_z_i = 0.1; // integral action gain
 
           // Find desired surge velocity
           double lateral_velocity_squared = v*v + w*w;
@@ -173,25 +214,13 @@ namespace Control
             return;
           }
 
-          // Find the desired pitch
-          double a = std::sqrt(u_ref*u_ref + w*w);
-          if (a < std::abs(vz))
-          {
-            war("The z-component of the desired linear velocity is too large. Cannot find corresponding pitch angle.");
-            return;
-          }
-          double theta_ref = -std::asin(vz / a) + std::atan2(w, u_ref);
-
           // Find the desired yaw
-          double b = u_ref*std::cos(theta_ref) + w*std::sin(theta_ref);
-          double psi_ref = std::atan2(vy, vx) - std::atan2(v, b);
+          double U = std::sqrt(desired_velocity_squared);
+          double psi_ref = std::atan2(vy, vx) - std::asin(v / U);
 
-          // Filter the desired pitch
-          if (!isnan(theta_prev))
-          {
-            theta_ref = k_theta_filter*theta_ref + (1. - k_theta_filter)*theta_prev;
-            theta_prev = theta_ref;
-          }
+          // Find the desired pitch
+          e_z_i += z - z_prev - time_step*vz;
+          double theta_ref = -std::asin(vz / U) + K_z_i*e_z_i;
 
           debug("Setpoints: u = %f, theta = %f, psi = %f", u_ref, Angles::degrees(theta_ref), Angles::degrees(psi_ref));
 
