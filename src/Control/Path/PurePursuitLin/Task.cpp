@@ -45,6 +45,7 @@ namespace Control
       struct Task: public DUNE::Control::PathController
       {
         IMC::DesiredLinearState m_linstate;
+        double U;
 
         //! Constructor.
         //! @param[in] name task name.
@@ -52,7 +53,15 @@ namespace Control
         Task(const std::string& name, Tasks::Context& ctx):
           DUNE::Control::PathController(name, ctx)
         {
+          bind<IMC::DesiredPath>(this);
           m_linstate.flags = IMC::DesiredLinearState::FL_VX | IMC::DesiredLinearState::FL_VY | IMC::DesiredLinearState::FL_VZ;
+        }
+
+        void
+        consume(const IMC::DesiredPath* dpath)
+        {
+          U = dpath->speed;
+          debug("Desired path speed %f", U);
         }
 
         void
@@ -71,14 +80,14 @@ namespace Control
         onPathActivation(void)
         {
           // Activate heading controller.
-          enableControlLoops(IMC::CL_VELOCITY | IMC::CL_SPEED | IMC::CL_YAW | IMC::CL_PITCH);
+          enableControlLoops(IMC::CL_VELOCITY);
         }
 
         void
         onPathDeactivation(void)
         {
           // Deactivate heading controller.
-          disableControlLoops(IMC::CL_VELOCITY | IMC::CL_SPEED | IMC::CL_YAW | IMC::CL_PITCH);
+          disableControlLoops(IMC::CL_VELOCITY);
         }
 
         bool
@@ -91,15 +100,14 @@ namespace Control
         step(const IMC::EstimatedState& state, const TrackingState& ts)
         {
           // Head straight to target
-          double speed = 1.;
           double x_rel = ts.end.x - state.x;
           double y_rel = ts.end.y - state.y;
           double z_rel = ts.end.z - state.z;
           double inv_norm = 1. / std::sqrt(x_rel*x_rel + y_rel*y_rel + z_rel*z_rel);
 
-          m_linstate.vx = speed * x_rel * inv_norm;
-          m_linstate.vy = speed * y_rel * inv_norm;
-          m_linstate.vz = speed * z_rel * inv_norm;
+          m_linstate.vx = U * x_rel * inv_norm;
+          m_linstate.vy = U * y_rel * inv_norm;
+          m_linstate.vz = U * z_rel * inv_norm;
 
           dispatch(m_linstate);
         }
