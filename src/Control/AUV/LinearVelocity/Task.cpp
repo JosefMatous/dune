@@ -66,6 +66,8 @@ namespace Control
         //! Previous depth
         double z_prev;
         Delta m_last_step;
+        //! Integral gain of z-controller
+        double K_z_i;
 
         //! Constructor.
         //! @param[in] name task name.
@@ -74,6 +76,11 @@ namespace Control
           DUNE::Tasks::Task(name, ctx),
           m_scope_ref(0)
         {
+          param("Vertical Controller -- Integral Gain", K_z_i)
+            .defaultValue("0.2")
+            .minimumValue("0.0")
+            .description("Integral gain of the vertical rate controller");
+
           // Initialize main entity state.
           setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_IDLE);
 
@@ -200,7 +207,6 @@ namespace Control
           //debug("Lateral velocities: v = %f, w = %f", v, w);
 
           double time_step = m_last_step.getDelta();
-          const double K_z_i = 0.1; // integral action gain
 
           // Find desired surge velocity
           double lateral_velocity_squared = v*v + w*w;
