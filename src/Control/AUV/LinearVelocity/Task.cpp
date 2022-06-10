@@ -46,6 +46,15 @@ namespace Control
       //! Required control loops
       static const uint32_t c_required = IMC::CL_SPEED | IMC::CL_YAW | IMC::CL_PITCH;
 
+      struct Arguments
+      {
+        //! Integral gain of z-controller
+        double K_z_i; 
+        //! Maximum pitch angle reference
+        double max_pitch;
+      };
+      
+
       struct Task: public DUNE::Tasks::Task
       {
         double v, w;
@@ -66,8 +75,8 @@ namespace Control
         //! Previous depth
         double z_prev;
         Delta m_last_step;
-        //! Integral gain of z-controller
-        double K_z_i;
+
+        Arguments m_args;
 
         //! Constructor.
         //! @param[in] name task name.
@@ -76,10 +85,17 @@ namespace Control
           DUNE::Tasks::Task(name, ctx),
           m_scope_ref(0)
         {
-          param("Vertical Controller -- Integral Gain", K_z_i)
+          param("Vertical Controller -- Integral Gain", m_args.K_z_i)
             .defaultValue("0.2")
             .minimumValue("0.0")
             .description("Integral gain of the vertical rate controller");
+
+          param("Maximum Pitch Reference", m_args.max_pitch)
+            .defaultValue("10.0")
+            .minimumValue("5.0")
+            .maximumValue("35.0")
+            .units(Units::Degree)
+            .description("Maximum pitch reference used by vertical rate controller");
 
           // Initialize main entity state.
           setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_IDLE);
@@ -130,6 +146,13 @@ namespace Control
           requestDeactivation();
 
           reset();
+        }
+
+        void
+        onUpdateParameters(void)
+        {
+          if (paramChanged(m_args.max_pitch))
+            m_args.max_pitch = Angles::radians(m_args.max_pitch);
         }
 
         void
@@ -226,7 +249,8 @@ namespace Control
 
           // Find the desired pitch
           e_z_i += z - z_prev - time_step*vz;
-          double theta_ref = -std::asin(vz / U) + K_z_i*e_z_i;
+          double theta_ref = -std::asin(vz / U) + m_args.K_z_i*e_z_i;
+          theta_ref = trimValue(theta_ref, -m_args.max_pitch, m_args.max_pitch);
 
           debug("Setpoints: u = %f, theta = %f, psi = %f", u_ref, Angles::degrees(theta_ref), Angles::degrees(psi_ref));
 
