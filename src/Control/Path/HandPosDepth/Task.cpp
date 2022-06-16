@@ -117,8 +117,7 @@ namespace Control
                     / (x_end_start*x_end_start + y_end_start*y_end_start + z_end_start*z_end_start);
           // Sanity check
           debug("Start z = %f, end z = %f, vehicle z = %f, s = %f", ts.start.z, ts.end.z, state.z, s);
-          s = (s > 1.) ? 1. : s;
-          s = (s < 0.) ? 0. : s; // limit s to [0, 1]
+          s = trimValue(s, 0., 1.);
 
           m_zref.value = ts.start.z + s*z_end_start + d*std::sin(state.theta);
           m_zref.z_units = IMC::Z_DEPTH;
