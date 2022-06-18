@@ -93,7 +93,7 @@ namespace Control
         bool
         hasSpecificZControl(void) const
         {
-          return true;
+          return false;
         }
 
         void
