@@ -44,23 +44,13 @@ namespace Control
       using DUNE_NAMESPACES;
 
       //! Required control loops
-      static const uint32_t c_required = IMC::CL_SPEED | IMC::CL_YAW | IMC::CL_PITCH;
-
-      struct Arguments
-      {
-        //! Integral gain of z-controller
-        double K_z_i; 
-        //! Maximum pitch angle reference
-        double max_pitch;
-      };
-      
+      static const uint32_t c_required = IMC::CL_SPEED | IMC::CL_YAW;      
 
       struct Task: public DUNE::Tasks::Task
       {
         double v, w;
         double vx, vy, vz;
         IMC::DesiredHeading m_heading;
-        IMC::DesiredPitch m_pitch;
         IMC::DesiredSpeed m_speed;
         IMC::ControlLoops m_cloops;
         bool has_valid_reference;
@@ -68,15 +58,6 @@ namespace Control
         uint32_t m_scope_ref;
         //! Active loops
         uint32_t m_aloops;
-        //! Integrated z-error
-        double e_z_i;
-        //! Current depth
-        double z;
-        //! Previous depth
-        double z_prev;
-        Delta m_last_step;
-
-        Arguments m_args;
 
         //! Constructor.
         //! @param[in] name task name.
@@ -85,18 +66,6 @@ namespace Control
           DUNE::Tasks::Task(name, ctx),
           m_scope_ref(0)
         {
-          param("Vertical Controller -- Integral Gain", m_args.K_z_i)
-            .defaultValue("0.2")
-            .minimumValue("0.0")
-            .description("Integral gain of the vertical rate controller");
-
-          param("Maximum Pitch Reference", m_args.max_pitch)
-            .defaultValue("10.0")
-            .minimumValue("5.0")
-            .maximumValue("35.0")
-            .units(Units::Degree)
-            .description("Maximum pitch reference used by vertical rate controller");
-
           // Initialize main entity state.
           setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_IDLE);
 
@@ -151,18 +120,12 @@ namespace Control
         void
         onUpdateParameters(void)
         {
-          if (paramChanged(m_args.max_pitch))
-            m_args.max_pitch = Angles::radians(m_args.max_pitch);
         }
 
         void
         reset(void)
         {
           has_valid_reference = false;
-
-          e_z_i = 0.;
-          z = 0.;
-          z_prev = 0.;
         }
 
         void
@@ -172,8 +135,6 @@ namespace Control
           {
             v = msg->v;
             w = -msg->w;
-            z_prev = z;
-            z = msg->z;
             dispatch_references();
           }
         }
@@ -229,8 +190,6 @@ namespace Control
           //debug("Received desired velocity: vx = %f, vy = %f, vz = %f", vx, vy, vz);
           //debug("Lateral velocities: v = %f, w = %f", v, w);
 
-          double time_step = m_last_step.getDelta();
-
           // Find desired surge velocity
           double lateral_velocity_squared = v*v + w*w;
           double desired_velocity_squared = vx*vx + vy*vy + vz*vz;
@@ -247,20 +206,12 @@ namespace Control
           double U = std::sqrt(desired_velocity_squared);
           double psi_ref = std::atan2(vy, vx) - std::asin(v / U);
 
-          // Find the desired pitch
-          e_z_i += z - z_prev - time_step*vz;
-          double theta_ref = -std::asin(vz / U) + m_args.K_z_i*e_z_i;
-          theta_ref = trimValue(theta_ref, -m_args.max_pitch, m_args.max_pitch);
-
-          debug("Setpoints: u = %f, theta = %f, psi = %f", u_ref, Angles::degrees(theta_ref), Angles::degrees(psi_ref));
+          debug("Setpoints: u = %f, psi = %f", u_ref, Angles::degrees(psi_ref));
 
           // Dispatch messages
           m_speed.value = u_ref;
           m_speed.speed_units = IMC::SUNITS_METERS_PS;
           dispatch(m_speed);
-          
-          m_pitch.value = theta_ref;
-          dispatch(m_pitch);
 
           m_heading.value = psi_ref;
           dispatch(m_heading);
