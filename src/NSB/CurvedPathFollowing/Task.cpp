@@ -1,0 +1,227 @@
+//***************************************************************************
+// Copyright 2007-2022 Universidade do Porto - Faculdade de Engenharia      *
+// Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
+//***************************************************************************
+// This file is part of DUNE: Unified Navigation Environment.               *
+//                                                                          *
+// Commercial Licence Usage                                                 *
+// Licencees holding valid commercial DUNE licences may use this file in    *
+// accordance with the commercial licence agreement provided with the       *
+// Software or, alternatively, in accordance with the terms contained in a  *
+// written agreement between you and Faculdade de Engenharia da             *
+// Universidade do Porto. For licensing terms, conditions, and further      *
+// information contact lsts@fe.up.pt.                                       *
+//                                                                          *
+// Modified European Union Public Licence - EUPL v.1.1 Usage                *
+// Alternatively, this file may be used under the terms of the Modified     *
+// EUPL, Version 1.1 only (the "Licence"), appearing in the file LICENCE.md *
+// included in the packaging of this file. You may not use this work        *
+// except in compliance with the Licence. Unless required by applicable     *
+// law or agreed to in writing, software distributed under the Licence is   *
+// distributed on an "AS IS" basis, WITHOUT WARRANTIES OR CONDITIONS OF     *
+// ANY KIND, either express or implied. See the Licence for the specific    *
+// language governing permissions and limitations at                        *
+// https://github.com/LSTS/dune/blob/master/LICENCE.md and                  *
+// http://ec.europa.eu/idabc/eupl.html.                                     *
+//***************************************************************************
+// Author: Josef Matous                                                     *
+//***************************************************************************
+
+// DUNE headers.
+#include <DUNE/DUNE.hpp>
+
+#include "GeometricPath.hpp"
+#include "LineOfSight.hpp"
+
+namespace NSB
+{
+  //! Insert short task description here.
+  //!
+  //! Insert explanation on task behaviour here.
+  //! @author Josef Matous
+  namespace CurvedPathFollowing
+  {
+    using DUNE_NAMESPACES;
+
+    struct Task: public DUNE::Tasks::Task
+    {
+      //! Required control loops
+      static const uint32_t c_required = IMC::CL_VELOCITY | IMC::CL_DEPTH;      
+
+      Ellipse m_path;
+      LineOfSight m_los;
+      double m_path_parameter;
+      Delta m_last_step;
+
+      IMC::DesiredLinearState m_linstate;
+      IMC::DesiredZ m_z;
+      IMC::ControlLoops m_cloops;
+
+      //! Control loops last reference
+      uint32_t m_scope_ref;
+      //! Active loops
+      uint32_t m_aloops;      
+
+      //! Constructor.
+      //! @param[in] name task name.
+      //! @param[in] ctx context.
+      Task(const std::string& name, Tasks::Context& ctx):
+        DUNE::Tasks::Task(name, ctx),
+        m_scope_ref(0)
+      {
+        bind<IMC::VehicleState>(this);
+        bind<IMC::EstimatedState>(this);
+
+        m_path = Ellipse(0.71881387, -0.15195186, 50., 30., -0.6585325752983525, false, M_PI_2);
+        m_los = LineOfSight(15., false, 1.3, 0.5);
+
+        m_linstate.flags = IMC::DesiredLinearState::FL_VX | IMC::DesiredLinearState::FL_VY | IMC::DesiredLinearState::FL_VZ;
+
+        param("Ellipse -- Latitude", m_path.m_lat_center)
+          .defaultValue("0.71881387")
+          .description("Latitude of the center of the ellipse");
+        param("Ellipse -- Longitude", m_path.m_lon_center)
+          .defaultValue("-0.15195186")
+          .description("Longitude of the center of the ellipse");
+        param("Ellipse -- Semimajor Axis", m_path.m_a)
+          .defaultValue("50.")
+          .minimumValue("10.")
+          .maximumValue("100.")
+          .description("Semimajor axis of the ellipse");
+        param("Ellipse -- Semiminor Axis", m_path.m_b)
+          .defaultValue("30.")
+          .minimumValue("10.")
+          .maximumValue("100.")
+          .description("Semiminor axis of the ellipse");
+        param("Ellipse -- Clockwise", m_path.m_clockwise)
+          .defaultValue("false")
+          .description("True if the path goes clockwise; false if anticlockwise");
+        param("Ellipse -- Orientation", m_path.m_psi)
+          .defaultValue("-0.6585325752983525")
+          .description("Orientation (yaw angle) of the ellipse. Zero means semimajor axis facing north");
+        param("Ellipse -- Initial Phase", m_path.m_phi0)
+          .defaultValue("0.")
+          .description("Initial phase of the ellipse");
+
+        param("LOS -- Lookahead Distance", m_los.m_lookahead)
+          .defaultValue("15.")
+          .minimumValue("1.")
+          .maximumValue("100.")
+          .description("Lookahead distance of the LOS algorithm");
+        param("LOS -- Adaptive", m_los.m_adaptive)
+          .defaultValue("true")
+          .description("True if using adaptive lookahead distance");
+        param("LOS -- Speed", m_los.m_speed)
+          .defaultValue("1.3")
+          .minimumValue("0.5")
+          .maximumValue("2.")
+          .description("Path following speed");
+        param("LOS -- Gain", m_los.m_parameter_gain)
+          .defaultValue("0.5")
+          .minimumValue("0.1")
+          .maximumValue("2.")
+          .description("Path parameter update gain");
+      }
+
+      void
+      onActivation(void)
+      {
+        setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_ACTIVE);
+        reset();
+
+        // Activate control loops
+        if ((c_required & m_aloops) == c_required)
+          return;
+
+        m_aloops |= c_required;
+        m_cloops.enable = IMC::ControlLoops::CL_ENABLE;
+        m_cloops.mask = c_required;
+        m_cloops.scope_ref = m_scope_ref;
+        dispatch(m_cloops);
+      }
+
+      void
+      onDeactivation(void)
+      {
+        setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_IDLE);
+        reset();
+
+        // Deactivate control loops
+        if ((c_required & ~m_aloops) == c_required)
+          return;
+
+        m_aloops &= ~c_required;
+        m_cloops.enable = IMC::ControlLoops::CL_DISABLE;
+        m_cloops.mask = c_required;
+        m_cloops.scope_ref = m_scope_ref;
+        dispatch(m_cloops);
+
+        reset();
+      }
+
+      void
+      onResourceInitialization(void)
+      {
+        requestDeactivation();
+
+        reset();
+      }
+
+      void
+      reset(void)
+      {
+        m_path_parameter = 0.;
+      }
+
+      void
+      consume(const IMC::VehicleState* msg)
+      {
+        if (msg->op_mode == IMC::VehicleState::OperationModeEnum::VS_MANEUVER)
+        {
+          if (!isActive())
+            requestActivation();
+        }
+        else
+        {
+          if (isActive())
+            requestDeactivation();
+        }
+      }
+
+      void
+      consume(const IMC::EstimatedState* msg)
+      {
+        if (isActive())
+        {
+          GeometricPath::PathReference path_ref = m_path.getPathReference(m_path_parameter);
+          double x_err, y_err;
+          GeometricPath::getPathFollowingError(path_ref, msg, &x_err, &y_err);
+          LineOfSight::LineOfSightOutput out = m_los.step(path_ref, x_err, y_err);
+          double delta_t = m_last_step.getDelta();
+          m_path_parameter += delta_t * out.path_parameter_derivative;
+
+          m_z.value = 0.;
+          m_z.z_units = IMC::Z_DEPTH;
+          dispatch(m_z);
+
+          m_linstate.vx = out.velocity_x;
+          m_linstate.vy = out.velocity_y;
+          m_linstate.vz = 0.;
+          dispatch(m_linstate);
+        }
+      }
+
+      //! Main loop.
+      void
+      onMain(void)
+      {
+        while (!stopping())
+        {
+          waitForMessages(1.0);
+        }
+      }
+    };
+  }
+}
+
+DUNE_TASK
