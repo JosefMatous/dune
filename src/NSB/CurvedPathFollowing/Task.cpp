@@ -57,6 +57,7 @@ namespace NSB
       IMC::DesiredZ m_z;
       IMC::ControlLoops m_cloops;
       IMC::CurvedPathReference m_path_ref;
+      IMC::Reference m_final_ref;
 
       //! Control loops last reference
       uint32_t m_scope_ref;
@@ -67,6 +68,14 @@ namespace NSB
       bool m_is_maneuvering;  
       //! Vehicle is executing "follow_nsb" plan
       bool m_is_executing;
+
+      //! Stop time
+      double m_T_stop;
+      //! Timestamp of experiment start
+      double m_T_start;
+      //! Stop parameter
+      double m_param_stop;
+      bool m_sent_termination;
 
       //! Constructor.
       //! @param[in] name task name.
@@ -86,6 +95,10 @@ namespace NSB
 
         m_is_maneuvering = false;
         m_is_executing = false;
+        m_T_start = -1.;
+        m_sent_termination = false;
+
+        m_final_ref.flags = IMC::Reference::FLAG_LOCATION | IMC::Reference::FLAG_MANDONE;
 
         param("Ellipse -- Latitude", m_path.m_lat_center)
           .defaultValue("0.71881387")
@@ -131,6 +144,13 @@ namespace NSB
           .minimumValue("0.1")
           .maximumValue("2.")
           .description("Path parameter update gain");
+
+        param("Experiment Stop Time", m_T_stop)
+          .defaultValue("-1")
+          .description("The task is stopped after the given time. Enter negative value to ignore this.");
+        param("Experiment Stop Parameter", m_param_stop)
+          .defaultValue("-1")
+          .description("The task is stop when path parameter exceeds the given value. Enter negative value to ignore this.");
       }
 
       void
@@ -170,6 +190,13 @@ namespace NSB
       }
 
       void
+      onUpdateParameters(void)
+      {
+        if (m_T_stop < 0. && m_param_stop < 0.)
+          war("Both time and parameter stop conditions are inactive. The experiment will run until stopped externally.");
+      }
+
+      void
       onResourceInitialization(void)
       {
         requestDeactivation();
@@ -183,6 +210,8 @@ namespace NSB
         m_path_parameter = 0.;
         m_is_maneuvering = false;
         m_is_executing = false;
+        m_T_start = -1.;
+        m_sent_termination = false;
       }
 
       void
@@ -270,7 +299,36 @@ namespace NSB
           m_linstate.vy = out.velocity_y;
           m_linstate.vz = 0.;
           dispatch(m_linstate);
+
+          if (m_T_stop > 0.) // check for time-based termination
+          {
+            if (m_T_start < 0.) // first-time step -- get current timestamp
+              m_T_start = Time::Clock::get();
+            else if ((Time::Clock::get() - m_T_start >= m_T_stop) && !m_sent_termination)
+            {
+              debug("Reached experiment termination time.");
+              terminateExperiment(path_ref.lat, path_ref.lon);
+            }            
+          }
+          if (m_param_stop > 0.) // check for parameter-based termination
+          {
+            if ((m_path_parameter > m_param_stop) && !m_sent_termination)
+            {
+              debug("Reached experiment termination parameter.");
+              terminateExperiment(path_ref.lat, path_ref.lon);
+            }
+          }
         }
+      }
+
+      inline void
+      terminateExperiment(double lat, double lon)
+      {
+        debug("Terminating experiment");
+        m_final_ref.lat = lat;
+        m_final_ref.lon = lon;
+        dispatch(m_final_ref);
+        m_sent_termination = true;
       }
 
       //! Main loop.
