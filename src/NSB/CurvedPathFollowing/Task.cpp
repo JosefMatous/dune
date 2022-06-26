@@ -56,6 +56,7 @@ namespace NSB
       IMC::DesiredLinearState m_linstate;
       IMC::DesiredZ m_z;
       IMC::ControlLoops m_cloops;
+      IMC::CurvedPathReference m_path_ref;
 
       //! Control loops last reference
       uint32_t m_scope_ref;
@@ -245,6 +246,16 @@ namespace NSB
         if (isActive())
         {
           GeometricPath::PathReference path_ref = m_path.getPathReference(m_path_parameter);
+
+          // Dispatch path reference
+          m_path_ref.param = m_path_parameter;
+          m_path_ref.lat = path_ref.lat;
+          m_path_ref.lon = path_ref.lon;
+          m_path_ref.z = 0.;
+          m_path_ref.theta = 0.;
+          m_path_ref.psi = path_ref.psi;
+          dispatch(m_path_ref);
+
           double x_err, y_err;
           GeometricPath::getPathFollowingError(path_ref, msg, &x_err, &y_err);
           LineOfSight::LineOfSightOutput out = m_los.step(path_ref, x_err, y_err);
