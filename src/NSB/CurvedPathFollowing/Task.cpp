@@ -60,7 +60,12 @@ namespace NSB
       //! Control loops last reference
       uint32_t m_scope_ref;
       //! Active loops
-      uint32_t m_aloops;      
+      uint32_t m_aloops;    
+
+      //! Vehicle is in maneuver mode
+      bool m_is_maneuvering;  
+      //! Vehicle is executing "follow_nsb" plan
+      bool m_is_executing;
 
       //! Constructor.
       //! @param[in] name task name.
@@ -70,12 +75,16 @@ namespace NSB
         m_scope_ref(0)
       {
         bind<IMC::VehicleState>(this);
+        bind<IMC::PlanControlState>(this);
         bind<IMC::EstimatedState>(this);
 
         m_path = Ellipse(0.71881387, -0.15195186, 50., 30., -0.6585325752983525, false, M_PI_2);
         m_los = LineOfSight(15., false, 1.3, 0.5);
 
         m_linstate.flags = IMC::DesiredLinearState::FL_VX | IMC::DesiredLinearState::FL_VY | IMC::DesiredLinearState::FL_VZ;
+
+        m_is_maneuvering = false;
+        m_is_executing = false;
 
         param("Ellipse -- Latitude", m_path.m_lat_center)
           .defaultValue("0.71881387")
@@ -171,6 +180,8 @@ namespace NSB
       reset(void)
       {
         m_path_parameter = 0.;
+        m_is_maneuvering = false;
+        m_is_executing = false;
       }
 
       void
@@ -178,13 +189,53 @@ namespace NSB
       {
         if (msg->op_mode == IMC::VehicleState::OperationModeEnum::VS_MANEUVER)
         {
-          if (!isActive())
+          m_is_maneuvering = true;
+          if (m_is_executing && !isActive())
             requestActivation();
         }
         else
         {
+          m_is_maneuvering = false;
           if (isActive())
+          {
+            debug("Vehicle exited maneuver mode. Deactivating task ...");
             requestDeactivation();
+          }
+        }
+      }
+
+      void
+      consume(const IMC::PlanControlState* msg)
+      {
+        if (msg->plan_id.compare("follow_nsb") == 0)
+        {
+          if (msg->state == IMC::PlanControlState::PCS_EXECUTING) 
+          {
+            m_is_executing = true;
+            if (m_is_maneuvering && !isActive())
+              requestActivation();
+          }
+          else
+          {
+            m_is_executing = false;
+            if (isActive())
+            {
+              debug("Vehicle stopped executing \"follow_nsb\" plan. Deactivating task ...");
+              requestDeactivation();
+            }
+          }
+        }
+        else
+        {
+          if (msg->state == IMC::PlanControlState::PCS_EXECUTING) 
+          {
+            m_is_executing = false;
+            if (isActive())
+            {
+              debug("Vehicle is executing a different plan. Deactivating task ...");
+              requestDeactivation();
+            }
+          }
         }
       }
 
