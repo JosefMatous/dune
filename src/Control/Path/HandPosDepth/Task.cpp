@@ -51,12 +51,21 @@ namespace Control
         Delta m_last_step;
         double ey_int = 0;
 
+        double m_length;
+        bool m_surface_mode;
+
         //! Constructor.
         //! @param[in] name task name.
         //! @param[in] ctx context.
         Task(const std::string& name, Tasks::Context& ctx):
           DUNE::Control::PathController(name, ctx)
         {
+          param("Hand Length", m_length)
+            .defaultValue("1.")
+            .minimumValue("0.");
+          param("Surface Mode", m_surface_mode)
+            .defaultValue("false")
+            .description("Set to true if the vehicle has to stay on the surface.");
         }
 
         //! Update internal state with new parameter values.
@@ -93,33 +102,40 @@ namespace Control
         {
           // This section is copy-pasted from Claudio's hand controller
           double a = 100;
-          double ref; double k = .2; double d = 1.0; double ey = ts.track_pos.y + d*std::sin(state.psi - ts.track_bearing);
+          double ref; double k = .2; double ey = ts.track_pos.y + m_length*std::sin(state.psi - ts.track_bearing);
           double k_int = 1/a;
           double time_step = m_last_step.getDelta();
 
           // Euler integration
           ey_int += ey*time_step ;
 
-          ref = ts.track_bearing - (k*ey*std::cos(state.psi - ts.track_bearing)/d) - k_int*ey_int*std::cos(state.psi- ts.track_bearing)/d;
+          ref = ts.track_bearing - (k*ey*std::cos(state.psi - ts.track_bearing)/m_length) - k_int*ey_int*std::cos(state.psi- ts.track_bearing)/m_length;
           m_heading.value =  Angles::normalizeRadian(ref);
           //debug("Actual psi = %f, bearing = %f,  ey = %f, ey_int = %f" ,Angles::degrees(state.psi), Angles::degrees(ts.track_bearing), ey, ey_int );
           dispatch(m_heading);
 
           //! Depth control
           // Find the closest point on the path from the vehicle's hand position
-          double x_end_start = ts.end.x - ts.start.x;
-          double y_end_start = ts.end.y - ts.start.y;
-          double z_end_start = ts.end.z - ts.start.z;
-          double x_hand_start = state.x + d*std::cos(state.theta)*std::cos(state.psi) - ts.start.x;
-          double y_hand_start = state.y + d*std::cos(state.theta)*std::sin(state.psi) - ts.start.y;
-          double z_hand_start = state.z - d*std::sin(state.theta) - ts.start.z;
-          double s = (x_end_start*x_hand_start + y_end_start*y_hand_start + z_end_start*z_hand_start)
-                    / (x_end_start*x_end_start + y_end_start*y_end_start + z_end_start*z_end_start);
-          // Sanity check
-          debug("Start z = %f, end z = %f, vehicle z = %f, s = %f", ts.start.z, ts.end.z, state.z, s);
-          s = trimValue(s, 0., 1.);
+          if (!m_surface_mode)
+          {
+            double x_end_start = ts.end.x - ts.start.x;
+            double y_end_start = ts.end.y - ts.start.y;
+            double z_end_start = ts.end.z - ts.start.z;
+            double x_hand_start = state.x + m_length*std::cos(state.theta)*std::cos(state.psi) - ts.start.x;
+            double y_hand_start = state.y + m_length*std::cos(state.theta)*std::sin(state.psi) - ts.start.y;
+            double z_hand_start = state.z - m_length*std::sin(state.theta) - ts.start.z;
+            double s = (x_end_start*x_hand_start + y_end_start*y_hand_start + z_end_start*z_hand_start)
+                      / (x_end_start*x_end_start + y_end_start*y_end_start + z_end_start*z_end_start);
+            // Sanity check
+            debug("Start z = %f, end z = %f, vehicle z = %f, s = %f", ts.start.z, ts.end.z, state.z, s);
+            s = trimValue(s, 0., 1.);
 
-          m_zref.value = ts.start.z + s*z_end_start + d*std::sin(state.theta);
+            m_zref.value = ts.start.z + s*z_end_start + m_length*std::sin(state.theta);
+          }
+          else
+          {
+            m_zref.value = 0.;
+          }
           m_zref.z_units = IMC::Z_DEPTH;
           dispatch(m_zref);
         }        
