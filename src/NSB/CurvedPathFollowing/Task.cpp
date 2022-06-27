@@ -88,7 +88,7 @@ namespace NSB
         bind<IMC::PlanControlState>(this);
         bind<IMC::EstimatedState>(this);
 
-        m_path = Ellipse(0.71881387, -0.15195186, 50., 30., -0.6585325752983525, false, M_PI_2);
+        m_path = Ellipse(0.71881387, -0.15195186, 0., 50., 30., 0., -0.6585325752983525, 0., false, M_PI_2, 0.);
         m_los = LineOfSight(15., false, 1.3, 0.5);
 
         m_linstate.flags = IMC::DesiredLinearState::FL_VX | IMC::DesiredLinearState::FL_VY | IMC::DesiredLinearState::FL_VZ;
@@ -106,6 +106,9 @@ namespace NSB
         param("Ellipse -- Longitude", m_path.m_lon_center)
           .defaultValue("-0.15195186")
           .description("Longitude of the center of the ellipse");
+        param("Ellipse -- Depth", m_path.m_z_center)
+          .defaultValue("0.")
+          .description("Depth of the center of the ellipse");
         param("Ellipse -- Semimajor Axis", m_path.m_a)
           .defaultValue("50.")
           .minimumValue("10.")
@@ -116,15 +119,26 @@ namespace NSB
           .minimumValue("10.")
           .maximumValue("100.")
           .description("Semiminor axis of the ellipse");
+        param("Ellipse -- Z Amplitude", m_path.m_c)
+          .defaultValue("0.")
+          .minimumValue("0.")
+          .maximumValue("10.")
+          .description("Amplitude of oscillations in the z-axis");
         param("Ellipse -- Clockwise", m_path.m_clockwise)
           .defaultValue("false")
           .description("True if the path goes clockwise; false if anticlockwise");
         param("Ellipse -- Orientation", m_path.m_psi)
           .defaultValue("-0.6585325752983525")
           .description("Orientation (yaw angle) of the ellipse. Zero means semimajor axis facing north");
+        param("Ellipse -- Z Frequency", m_path.m_z_freq)
+          .defaultValue("0.")
+          .description("Frequency of oscillations in the z-axis");
         param("Ellipse -- Initial Phase", m_path.m_phi0)
           .defaultValue("0.")
           .description("Initial phase of the ellipse");
+        param("Ellipse -- Z Initial Phase", m_path.m_z_phi0)
+          .defaultValue("0.")
+          .description("Initial phase of oscillations in the z-axis");
 
         param("LOS -- Lookahead Distance", m_los.m_lookahead)
           .defaultValue("15.")
@@ -280,8 +294,8 @@ namespace NSB
           m_path_ref.param = m_path_parameter;
           m_path_ref.lat = path_ref.lat;
           m_path_ref.lon = path_ref.lon;
-          m_path_ref.z = 0.;
-          m_path_ref.theta = 0.;
+          m_path_ref.z = path_ref.z;
+          m_path_ref.theta = path_ref.theta;
           m_path_ref.psi = path_ref.psi;
           dispatch(m_path_ref);
 
@@ -291,7 +305,7 @@ namespace NSB
           double delta_t = m_last_step.getDelta();
           m_path_parameter += delta_t * out.path_parameter_derivative;
 
-          m_z.value = 0.;
+          m_z.value = m_path_ref.z;
           m_z.z_units = IMC::Z_DEPTH;
           dispatch(m_z);
 

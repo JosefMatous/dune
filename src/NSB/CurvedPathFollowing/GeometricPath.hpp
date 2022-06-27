@@ -47,8 +47,8 @@ namespace NSB
     class GeometricPath {
       public:
         struct PathReference {
-          double lat, lon;
-          double psi;
+          double lat, lon, z;
+          double theta, psi;
           double gradient;
         };
 
@@ -77,32 +77,42 @@ namespace NSB
 
     class Ellipse: public GeometricPath {
       public:
-        double m_lat_center, m_lon_center;
-        double m_a, m_b;
+        double m_lat_center, m_lon_center, m_z_center;
+        double m_a, m_b, m_c;
         double m_psi;
+        double m_z_freq;
         bool m_clockwise;
-        double m_phi0;
+        double m_phi0, m_z_phi0;
 
-        Ellipse(double lat_center, double lon_center, double a, double b, double psi, bool clockwise, double phi0) 
+        Ellipse(double lat_center, double lon_center, double z_center, 
+          double a, double b, double c, double psi, double z_freq, bool clockwise, double phi0, double z_phi0) 
         {
           m_lat_center = lat_center;
           m_lon_center = lon_center;
+          m_z_center = z_center;
           m_a = a;
           m_b = b;
+          m_c = c;
           m_psi = psi;
+          m_z_freq = z_freq;
           m_clockwise = clockwise;
           m_phi0 = phi0;
+          m_z_phi0 = z_phi0;
         }
 
         Ellipse()
         {
           m_lat_center = 0.71881387;
           m_lon_center = -0.15195186;
+          m_z_center = 0.;
           m_a = 50.;
           m_b = 30.;
+          m_c = 0.;
           m_psi = 0.;
+          m_z_freq = 0.;
           m_clockwise = true;
           m_phi0 = M_PI_2;
+          m_z_phi0 = 0.;
         }
 
         PathReference
@@ -113,30 +123,45 @@ namespace NSB
           // Calculate path argument
           double direction = m_clockwise ? 1. : -1;
           double arg = m_phi0 + direction*s;
+          double z_arg = m_z_phi0 + s*m_z_freq;
 
           // Get nominal position
           double c_arg = std::cos(arg);
           double s_arg = std::sin(arg);
           double x0 = m_a*c_arg;
           double y0 = m_b*s_arg;
+          double z0 = m_c*std::sin(z_arg);
 
           // Rotate by ellipse orientation
           double c_psi = std::cos(m_psi);
           double s_psi = std::sin(m_psi);
           double x_ned = x0*c_psi - y0*s_psi;
           double y_ned = y0*c_psi + x0*s_psi;
+          double z_ned = m_z_center + z0;
 
           // Calculate lat/lon
           ref.lat = m_lat_center;
           ref.lon = m_lon_center;
-          WGS84::displace(x_ned, y_ned, &(ref.lat), &(ref.lon));
+          WGS84::displace(x_ned, y_ned, &(ref.lat), &(ref.lon));          
 
           // Calculate derivatives
           double x0_dot = -direction*m_a*s_arg;
           double y0_dot =  direction*m_b*c_arg;
-          // Gradient
-          ref.gradient = std::sqrt(square(x0_dot) + square(y0_dot));
-          // Path-tangential angle
+          // Gradient and pitch angle
+          if (z_ned > 0)
+          {
+            ref.z = z_ned;
+            double z0_dot = m_z_freq*m_c*std::cos(z_arg);
+            ref.gradient = std::sqrt(square(x0_dot) + square(y0_dot) + square(z0_dot));
+            ref.theta = -std::asin(z0_dot / ref.gradient);
+          }
+          else
+          { // saturate to zero if the reference depth is negative
+            ref.z = 0.;
+            ref.gradient = std::sqrt(square(x0_dot) + square(y0_dot));
+            ref.theta = 0.;
+          }
+          // Path yaw angle
           ref.psi = m_psi + std::atan2(y0_dot, x0_dot);
 
           return ref;
