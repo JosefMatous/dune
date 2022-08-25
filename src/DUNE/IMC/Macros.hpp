@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 67c0f72d81c2ccb3db5a1cc953056abc                            *
+// IMC XML MD5: 1239d4aa114d6003933998370bda84ea                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_MACROS_HPP_INCLUDED_
@@ -692,5 +692,7 @@
 #define DUNE_IMC_COMMRESTRICTION 2010
 //! CurvedPathReference identification number.
 #define DUNE_IMC_CURVEDPATHREFERENCE 2021
+//! NSBMsg identification number.
+#define DUNE_IMC_NSBMSG 2022
 
 #endif

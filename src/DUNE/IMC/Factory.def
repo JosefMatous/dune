@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 67c0f72d81c2ccb3db5a1cc953056abc                            *
+// IMC XML MD5: 1239d4aa114d6003933998370bda84ea                            *
 //***************************************************************************
 
 MESSAGE(1, EntityState)
@@ -360,4 +360,5 @@ MESSAGE(2004, FluorescentDissolvedOrganicMatter)
 MESSAGE(2006, TotalMagIntensity)
 MESSAGE(2010, CommRestriction)
 MESSAGE(2021, CurvedPathReference)
+MESSAGE(2022, NSBMsg)
 #undef MESSAGE

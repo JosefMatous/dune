@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 67c0f72d81c2ccb3db5a1cc953056abc                            *
+// IMC XML MD5: 1239d4aa114d6003933998370bda84ea                            *
 //***************************************************************************
 
 // ISO C++ 98 headers.
@@ -28154,6 +28154,80 @@ namespace DUNE
       IMC::toJSON(os__, "z", z, nindent__);
       IMC::toJSON(os__, "theta", theta, nindent__);
       IMC::toJSON(os__, "psi", psi, nindent__);
+    }
+
+    NSBMsg::NSBMsg(void)
+    {
+      m_header.mgid = 2022;
+      clear();
+    }
+
+    void
+    NSBMsg::clear(void)
+    {
+      path_param = 0;
+      x = 0;
+      y = 0;
+      z = 0;
+    }
+
+    bool
+    NSBMsg::fieldsEqual(const Message& msg__) const
+    {
+      const IMC::NSBMsg& other__ = static_cast<const NSBMsg&>(msg__);
+      if (path_param != other__.path_param) return false;
+      if (x != other__.x) return false;
+      if (y != other__.y) return false;
+      if (z != other__.z) return false;
+      return true;
+    }
+
+    int
+    NSBMsg::validate(void) const
+    {
+      return true;
+    }
+
+    uint8_t*
+    NSBMsg::serializeFields(uint8_t* bfr__) const
+    {
+      uint8_t* ptr__ = bfr__;
+      ptr__ += IMC::serialize(path_param, ptr__);
+      ptr__ += IMC::serialize(x, ptr__);
+      ptr__ += IMC::serialize(y, ptr__);
+      ptr__ += IMC::serialize(z, ptr__);
+      return ptr__;
+    }
+
+    uint16_t
+    NSBMsg::deserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      const uint8_t* start__ = bfr__;
+      bfr__ += IMC::deserialize(path_param, bfr__, size__);
+      bfr__ += IMC::deserialize(x, bfr__, size__);
+      bfr__ += IMC::deserialize(y, bfr__, size__);
+      bfr__ += IMC::deserialize(z, bfr__, size__);
+      return bfr__ - start__;
+    }
+
+    uint16_t
+    NSBMsg::reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      const uint8_t* start__ = bfr__;
+      bfr__ += IMC::reverseDeserialize(path_param, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(x, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(y, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(z, bfr__, size__);
+      return bfr__ - start__;
+    }
+
+    void
+    NSBMsg::fieldsToJSON(std::ostream& os__, unsigned nindent__) const
+    {
+      IMC::toJSON(os__, "path_param", path_param, nindent__);
+      IMC::toJSON(os__, "x", x, nindent__);
+      IMC::toJSON(os__, "y", y, nindent__);
+      IMC::toJSON(os__, "z", z, nindent__);
     }
   }
 }
