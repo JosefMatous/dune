@@ -35,12 +35,6 @@
 
 namespace NSB
 {
-  //! Miscellaneous utility functions and structures.
-  //!
-  //! Utilities for NSB algorithm.
-  //! @author Josef Matous
-  namespace CurvedPathFollowing
-  {
     using DUNE_NAMESPACES;
 
     template <typename T>
@@ -48,7 +42,11 @@ namespace NSB
     {
       return x*x;
     }
-  }
+
+    struct Vector3D
+    {
+      double x, y, z;
+    };
 }
 
 #endif

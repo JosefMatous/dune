@@ -36,12 +36,6 @@
 
 namespace NSB
 {
-  //! Insert short task description here.
-  //!
-  //! Insert explanation on task behaviour here.
-  //! @author Josef Matous
-  namespace CurvedPathFollowing
-  {
     using DUNE_NAMESPACES;
 
     class GeometricPath {
@@ -50,13 +44,14 @@ namespace NSB
           double lat, lon, z;
           double theta, psi;
           double gradient;
+          double kappa, iota;
         };
 
         virtual PathReference
         getPathReference(double path_parameter) { return PathReference(); }
 
-        static void
-        getPathFollowingError(PathReference ref, const IMC::EstimatedState* estate, double* x, double* y)
+        static Vector3D
+        getPathFollowingError(PathReference ref, const IMC::EstimatedState* estate)
         {
           // Get vehicle's latitude and longitude
           double lat_vehicle = estate->lat;
@@ -66,12 +61,18 @@ namespace NSB
           // Get displacement in NED frame
           double x_ned, y_ned, z_ned;
           WGS84::displacement(ref.lat, ref.lon, 0., lat_vehicle, lon_vehicle, 0., &x_ned, &y_ned, &z_ned);
+          z_ned = ref.z; // disregard the calculated z-coordinate
           
           // Transform displacement to path-tangential frame
+          double c_theta = std::cos(ref.theta);
+          double s_theta = std::sin(ref.theta);
           double c_psi = std::cos(ref.psi);
           double s_psi = std::sin(ref.psi);
-          *x = x_ned*c_psi + y_ned*s_psi;
-          *y = y_ned*c_psi - x_ned*s_psi;
+          Vector3D path_err;
+          path_err.x = x_ned*c_psi*c_theta - z_ned*s_theta + y_ned*c_theta*s_psi;
+          path_err.y = y_ned*c_psi - x_ned*s_psi;
+          path_err.z = z_ned*c_theta + x_ned*c_psi*s_theta + y_ned*s_psi*s_theta;
+          return path_err;
         }
     };
 
@@ -167,7 +168,6 @@ namespace NSB
           return ref;
         }
     };
-  }
 }
 
 #endif

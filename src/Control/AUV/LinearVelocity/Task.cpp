@@ -44,13 +44,15 @@ namespace Control
       using DUNE_NAMESPACES;
 
       //! Required control loops
-      static const uint32_t c_required = IMC::CL_SPEED | IMC::CL_YAW;      
+      static const uint32_t c_required = IMC::CL_SPEED | IMC::CL_YAW_RATE | IMC::CL_PITCH;      
 
       struct Task: public DUNE::Tasks::Task
       {
         double v, w;
         double vx, vy, vz;
-        IMC::DesiredHeading m_heading;
+        double vx_ref, vy_ref, vz_ref;
+        IMC::DesiredHeadingRate m_hrate;
+        IMC::DesiredPitch m_pitch;
         IMC::DesiredSpeed m_speed;
         IMC::ControlLoops m_cloops;
         bool has_valid_reference;
@@ -58,6 +60,16 @@ namespace Control
         uint32_t m_scope_ref;
         //! Active loops
         uint32_t m_aloops;
+
+        Delta m_last_step;
+
+        DiscretePID m_course_pid;
+        std::vector<float> m_course_gains;
+        float m_course_limit;
+        DiscretePID m_z_rate_pid;
+        std::vector<float> m_z_rate_gains;
+        float m_z_rate_limit;
+        float m_theta_max;
 
         //! Constructor.
         //! @param[in] name task name.
@@ -73,6 +85,37 @@ namespace Control
           bind<IMC::DesiredLinearState>(this);
           bind<IMC::ControlLoops>(this);
           has_valid_reference = false;
+
+          param("Course PID Gains", m_course_gains)
+            .defaultValue("15, 0, 0")
+            .size(3);
+          param("Course PID Integral Limit", m_course_limit)
+            .defaultValue("-1");
+          param("Vertical PID Gains", m_z_rate_gains)
+            .defaultValue("1, 0.05, 0")
+            .size(3);
+          param("Vertical PID Integral Limit", m_z_rate_limit)
+            .defaultValue("5");
+          param("Maximum Pitch Reference", m_theta_max)
+            .defaultValue("20");
+        }
+
+        //! Update internal parameters.
+        void
+        onUpdateParameters(void)
+        {
+          reset();
+
+          if (paramChanged(m_course_gains))
+            m_course_pid.setGains(m_course_gains);
+          if (paramChanged(m_course_limit))
+            m_course_pid.setIntegralLimits(m_course_limit);
+          if (paramChanged(m_z_rate_gains))
+            m_z_rate_pid.setGains(m_z_rate_gains);
+          if (paramChanged(m_z_rate_limit))
+            m_z_rate_pid.setIntegralLimits(m_z_rate_limit);
+          if (paramChanged(m_theta_max))
+            m_z_rate_pid.setOutputLimits(-Angles::radians(m_theta_max), Angles::radians(m_theta_max));          
         }
 
         void
@@ -118,14 +161,13 @@ namespace Control
         }
 
         void
-        onUpdateParameters(void)
-        {
-        }
-
-        void
         reset(void)
         {
           has_valid_reference = false;
+
+          m_course_pid.reset();
+          m_z_rate_pid.reset();
+          m_last_step.reset();
         }
 
         void
@@ -135,6 +177,9 @@ namespace Control
           {
             v = msg->v;
             w = -msg->w;
+            vx = msg->vx;
+            vy = msg->vy;
+            vz = msg->vz;
             dispatch_references();
           }
         }
@@ -150,9 +195,9 @@ namespace Control
               return;
             }
 
-            vx = msg->vx;
-            vy = msg->vy;
-            vz = msg->vz;
+            vx_ref = msg->vx;
+            vy_ref = msg->vy;
+            vz_ref = msg->vz;
             has_valid_reference = true;
           }
         }
@@ -190,9 +235,11 @@ namespace Control
           //debug("Received desired velocity: vx = %f, vy = %f, vz = %f", vx, vy, vz);
           //debug("Lateral velocities: v = %f, w = %f", v, w);
 
+          double delta_t = m_last_step.getDelta();
+
           // Find desired surge velocity
           double lateral_velocity_squared = v*v + w*w;
-          double desired_velocity_squared = vx*vx + vy*vy + vz*vz;
+          double desired_velocity_squared = vx_ref*vx_ref + vy_ref*vy_ref + vz_ref*vz_ref;
           double u_ref = 0.;
           if (desired_velocity_squared > lateral_velocity_squared)
             u_ref = std::sqrt(desired_velocity_squared - lateral_velocity_squared);
@@ -201,20 +248,19 @@ namespace Control
             war("Desired linear velocity is too small");
             return;
           }
-
-          // Find the desired yaw
-          double U = std::sqrt(desired_velocity_squared);
-          double psi_ref = std::atan2(vy, vx) - std::asin(v / U);
-
-          debug("Setpoints: u = %f, psi = %f", u_ref, Angles::degrees(psi_ref));
-
-          // Dispatch messages
           m_speed.value = u_ref;
           m_speed.speed_units = IMC::SUNITS_METERS_PS;
           dispatch(m_speed);
 
-          m_heading.value = psi_ref;
-          dispatch(m_heading);
+          // Course control
+          double chi_err = Angles::normalizeRadian(std::atan2(vy_ref, vx_ref) - std::atan2(vy, vx));
+          m_hrate.value = m_course_pid.step(delta_t, chi_err, 0.);
+          dispatch(m_hrate);
+
+          // Vertical rate control
+          double z_err = vz - vz_ref;
+          m_pitch.value = m_z_rate_pid.step(delta_t, z_err, 0.);
+          dispatch(m_pitch);
         }
 
         void

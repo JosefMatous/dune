@@ -30,14 +30,15 @@
 // DUNE headers.
 #include <DUNE/DUNE.hpp>
 
-#include "GeometricPath.hpp"
-#include "LineOfSight.hpp"
+#include "../GeometricPath.hpp"
+#include "../LineOfSight.hpp"
+#include "../Utilities.hpp"
 
 namespace NSB
 {
-  //! Insert short task description here.
+  //! Curved path following.
   //!
-  //! Insert explanation on task behaviour here.
+  //! This task uses a line-of-sight guidance algorithm to steer the vehicle along a given curved path.
   //! @author Josef Matous
   namespace CurvedPathFollowing
   {
@@ -46,7 +47,7 @@ namespace NSB
     struct Task: public DUNE::Tasks::Task
     {
       //! Required control loops
-      static const uint32_t c_required = IMC::CL_VELOCITY | IMC::CL_DEPTH;      
+      static const uint32_t c_required = IMC::CL_VELOCITY;      
 
       Ellipse m_path;
       LineOfSight m_los;
@@ -299,19 +300,14 @@ namespace NSB
           m_path_ref.psi = path_ref.psi;
           dispatch(m_path_ref);
 
-          double x_err, y_err;
-          GeometricPath::getPathFollowingError(path_ref, msg, &x_err, &y_err);
-          LineOfSight::LineOfSightOutput out = m_los.step(path_ref, x_err, y_err);
+          Vector3D path_err =  GeometricPath::getPathFollowingError(path_ref, msg);
+          LineOfSight::LineOfSightOutput out = m_los.step(path_ref, path_err);
           double delta_t = m_last_step.getDelta();
           m_path_parameter += delta_t * out.path_parameter_derivative;
 
-          m_z.value = m_path_ref.z;
-          m_z.z_units = IMC::Z_DEPTH;
-          dispatch(m_z);
-
-          m_linstate.vx = out.velocity_x;
-          m_linstate.vy = out.velocity_y;
-          m_linstate.vz = 0.;
+          m_linstate.vx = out.velocity.x;
+          m_linstate.vy = out.velocity.y;
+          m_linstate.vz = out.velocity.z;
           dispatch(m_linstate);
 
           if (m_T_stop > 0.) // check for time-based termination

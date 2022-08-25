@@ -37,12 +37,6 @@
 
 namespace NSB
 {
-  //! Line-of-sight guidance task.
-  //!
-  //! Returns desired LOS velocity and updates the path parameter.
-  //! @author Josef Matous
-  namespace CurvedPathFollowing
-  {
     using DUNE_NAMESPACES;
 
     class LineOfSight
@@ -78,39 +72,51 @@ namespace NSB
 
         struct LineOfSightOutput
         {
-          double velocity_x, velocity_y;
+          Vector3D velocity;
           double path_parameter_derivative;
         };      
 
         LineOfSightOutput
-        step(GeometricPath::PathReference path_ref, double x_err, double y_err)
+        step(GeometricPath::PathReference path_ref, Vector3D path_error)
         {
           LineOfSightOutput out;
           double lookahead;
           if (m_adaptive)
           {
-            lookahead = std::sqrt(square(m_lookahead) + square(x_err) + square(y_err));
+            lookahead = std::sqrt(square(m_lookahead) + square(path_error.x) + square(path_error.y) + square(path_error.z));
           }
           else
           {
             lookahead = m_lookahead;
           }
 
-          // Line-of-sight angle
-          double los_angle = path_ref.psi - std::atan(y_err / lookahead);
+          // Pre-calculate the sines and cosines of path angles
+          double c_theta = std::cos(path_ref.theta);
+          double s_theta = std::sin(path_ref.theta);
+          double c_psi = std::cos(path_ref.psi);
+          double s_psi = std::sin(path_ref.psi);
+
+          // Additional line-of-sight angle
+          // definition: theta_los = asin(path_error.z / D)
+          //               psi_los = -atan(path_error.y / lookahead)
+          double D = std::sqrt(square(lookahead) + square(path_error.y) + square(path_error.z));
+          double c_theta_los = std::sqrt(square(D) - square(path_error.z)) / D;
+          double s_theta_los = path_error.z / D;
+          double psi_denominator = std::sqrt(square(lookahead) + square(path_error.y));
+          double c_psi_los = lookahead / psi_denominator;
+          double s_psi_los = -path_error.y / psi_denominator;
 
           // LOS velocities
-          out.velocity_x = m_speed * std::cos(los_angle);
-          out.velocity_y = m_speed * std::sin(los_angle);
+          out.velocity.x = m_speed * (c_psi*c_psi_los*c_theta*c_theta_los - c_theta*s_psi*s_psi_los - c_psi_los*s_theta*s_theta_los);
+          out.velocity.y = m_speed * (c_psi_los*c_theta*s_psi - s_psi_los*s_theta*s_theta_los + c_psi*c_theta*c_theta_los*s_psi_los);
+          out.velocity.z = m_speed * (- c_theta_los*s_theta - c_psi*c_theta*s_theta_los);
 
           // Path parameter update law
-          double D = std::sqrt(square(lookahead) + square(y_err));
-          out.path_parameter_derivative = m_speed * (lookahead/D + m_parameter_gain*x_err/std::sqrt(square(x_err) + 1)) / path_ref.gradient;
+          out.path_parameter_derivative = m_speed * (lookahead/D + m_parameter_gain*path_error.x/std::sqrt(square(path_error.x) + 1)) / path_ref.gradient;
 
           return out;
         }
     };    
-  }
 }
 
 #endif
