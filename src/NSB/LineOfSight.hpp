@@ -90,26 +90,27 @@ namespace NSB
             lookahead = m_lookahead;
           }
 
-          // Pre-calculate the sines and cosines of path angles
-          double c_theta = std::cos(path_ref.theta);
-          double s_theta = std::sin(path_ref.theta);
-          double c_psi = std::cos(path_ref.psi);
-          double s_psi = std::sin(path_ref.psi);
-
           // Additional line-of-sight angle
           // definition: theta_los = asin(path_error.z / D)
           //               psi_los = -atan(path_error.y / lookahead)
           double D = std::sqrt(square(lookahead) + square(path_error.y) + square(path_error.z));
-          double c_theta_los = std::sqrt(square(D) - square(path_error.z)) / D;
-          double s_theta_los = path_error.z / D;
-          double psi_denominator = std::sqrt(square(lookahead) + square(path_error.y));
-          double c_psi_los = lookahead / psi_denominator;
-          double s_psi_los = -path_error.y / psi_denominator;
+          double theta_D = std::asin(path_error.z / D);
+          double psi_D = - std::atan(path_error.y / lookahead);
+          
+          //double theta_los = path_ref.theta + theta_D;
+          //double psi_los = path_ref.psi + psi_D;
+          double theta_los = path_ref.theta;
+          double psi_los = path_ref.psi;
+
+          double c_theta_los = std::cos(theta_los);
+          double s_theta_los = std::cos(theta_los);
+          double c_psi_los = std::cos(psi_los);
+          double s_psi_los = std::cos(psi_los);
 
           // LOS velocities
-          out.velocity.x = m_speed * (c_psi*c_psi_los*c_theta*c_theta_los - c_theta*s_psi*s_psi_los - c_psi_los*s_theta*s_theta_los);
-          out.velocity.y = m_speed * (c_psi_los*c_theta*s_psi - s_psi_los*s_theta*s_theta_los + c_psi*c_theta*c_theta_los*s_psi_los);
-          out.velocity.z = m_speed * (- c_theta_los*s_theta - c_psi*c_theta*s_theta_los);
+          out.velocity.x = m_speed * c_theta_los * c_psi_los;
+          out.velocity.y = m_speed * c_theta_los * s_psi_los;
+          out.velocity.z = m_speed * (-s_theta_los);
 
           // Path parameter update law
           out.path_parameter_derivative = m_speed * (lookahead/D + m_parameter_gain*path_error.x/std::sqrt(square(path_error.x) + 1)) / path_ref.gradient;

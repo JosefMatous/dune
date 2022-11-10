@@ -51,17 +51,12 @@ namespace NSB
         getPathReference(double path_parameter) { return PathReference(); }
 
         static Vector3D
-        getPathFollowingError(PathReference ref, const IMC::EstimatedState* estate)
+        getPathFollowingError(PathReference ref, double lat_vehicle, double lon_vehicle, double z_vehicle)
         {
-          // Get vehicle's latitude and longitude
-          double lat_vehicle = estate->lat;
-          double lon_vehicle = estate->lon;
-          WGS84::displace(estate->x, estate->y, &lat_vehicle, &lon_vehicle);
-
           // Get displacement in NED frame
           double x_ned, y_ned, z_ned;
           WGS84::displacement(ref.lat, ref.lon, 0., lat_vehicle, lon_vehicle, 0., &x_ned, &y_ned, &z_ned);
-          z_ned = ref.z; // disregard the calculated z-coordinate
+          z_ned = z_vehicle - ref.z; // disregard the calculated z-coordinate
           
           // Transform displacement to path-tangential frame
           double c_theta = std::cos(ref.theta);
@@ -73,6 +68,17 @@ namespace NSB
           path_err.y = y_ned*c_psi - x_ned*s_psi;
           path_err.z = z_ned*c_theta + x_ned*c_psi*s_theta + y_ned*s_psi*s_theta;
           return path_err;
+        }
+
+        static Vector3D
+        getPathFollowingError(PathReference ref, const IMC::EstimatedState* estate)
+        {
+          // Get vehicle's latitude and longitude
+          double lat_vehicle = estate->lat;
+          double lon_vehicle = estate->lon;
+          WGS84::displace(estate->x, estate->y, &lat_vehicle, &lon_vehicle);
+
+          return getPathFollowingError(ref, lat_vehicle, lon_vehicle, estate->depth);
         }
     };
 

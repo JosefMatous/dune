@@ -32,32 +32,51 @@
 
 #include "../GeometricPath.hpp"
 #include "../LineOfSight.hpp"
+#include "../FormationKeeping.hpp"
 #include "../Utilities.hpp"
 
 namespace NSB
 {
-  //! Curved path following.
+  //! Distributed NSB algorithm
   //!
-  //! This task uses a line-of-sight guidance algorithm to steer the vehicle along a given curved path.
+  //! This task implements the distributed NSB algorithm.
   //! @author Josef Matous
-  namespace CurvedPathFollowing
+  namespace DistributedNSB
   {
     using DUNE_NAMESPACES;
 
     struct Task: public DUNE::Tasks::Task
     {
       //! Required control loops
-      static const uint32_t c_required = IMC::CL_VELOCITY;      
+      static const uint32_t c_required = IMC::CL_VELOCITY | IMC::CL_DEPTH;      
 
       Ellipse m_path;
       LineOfSight m_los;
+      FormationKeeping m_form;
       double m_path_parameter;
       Delta m_last_step;
+      struct
+      {
+        double x, y, z;
+      } m_barycenter_estimate;   
+
+      struct
+      {
+        //! Stop time
+        double m_T_stop;
+        //! Stop parameter
+        double m_param_stop;
+        //! Consensus gain
+        double k_consensus;
+      } m_nsb_parameters;  
+
+      std::vector<double> m_formation_shape;
 
       IMC::DesiredLinearState m_linstate;
       IMC::DesiredZ m_z;
       IMC::ControlLoops m_cloops;
       IMC::CurvedPathReference m_path_ref;
+      IMC::NSBMsg m_nsb_msg;
       IMC::Reference m_final_ref;
 
       //! Control loops last reference
@@ -65,17 +84,13 @@ namespace NSB
       //! Active loops
       uint32_t m_aloops;    
 
+      //! Timestamp of experiment start
+      double m_T_start;
       //! Vehicle is in maneuver mode
       bool m_is_maneuvering;  
       //! Vehicle is executing "follow_nsb" plan
       bool m_is_executing;
-
-      //! Stop time
-      double m_T_stop;
-      //! Timestamp of experiment start
-      double m_T_start;
-      //! Stop parameter
-      double m_param_stop;
+      //! True if the task already sent a termination message
       bool m_sent_termination;
 
       //! Constructor.
@@ -88,6 +103,7 @@ namespace NSB
         bind<IMC::VehicleState>(this);
         bind<IMC::PlanControlState>(this);
         bind<IMC::EstimatedState>(this);
+        bind<IMC::NSBMsg>(this);
 
         m_path = Ellipse(0.71881387, -0.15195186, 0., 50., 30., 0., -0.6585325752983525, 0., false, M_PI_2, 0.);
         m_los = LineOfSight(15., false, 1.3, 0.5);
@@ -160,12 +176,24 @@ namespace NSB
           .maximumValue("2.")
           .description("Path parameter update gain");
 
-        param("Experiment Stop Time", m_T_stop)
+        param("Experiment Stop Time", m_nsb_parameters.m_T_stop)
           .defaultValue("-1")
           .description("The task is stopped after the given time. Enter negative value to ignore this.");
-        param("Experiment Stop Parameter", m_param_stop)
+        param("Experiment Stop Parameter", m_nsb_parameters.m_param_stop)
           .defaultValue("-1")
           .description("The task is stop when path parameter exceeds the given value. Enter negative value to ignore this.");
+
+        param("Consensus Gain", m_nsb_parameters.k_consensus)
+          .defaultValue("0.3");
+
+        param("Formation Keeping -- Shape", m_formation_shape)
+          .defaultValue("0., 0., 0.")
+          .size(3)
+          .description("Position of the vehicle within the formation");
+        param("Formation Keeping -- Gain", m_form.k_form)
+          .defaultValue("0.3")
+          .minimumValue("0.")
+          .description("Formation keeping task gain");
       }
 
       void
@@ -207,8 +235,15 @@ namespace NSB
       void
       onUpdateParameters(void)
       {
-        if (m_T_stop < 0. && m_param_stop < 0.)
+        if (m_nsb_parameters.m_T_stop < 0. && m_nsb_parameters.m_param_stop < 0.)
           war("Both time and parameter stop conditions are inactive. The experiment will run until stopped externally.");
+
+        if (paramChanged(m_formation_shape))
+        {
+          m_form.p_form.x = m_formation_shape[0];
+          m_form.p_form.y = m_formation_shape[1];
+          m_form.p_form.z = m_formation_shape[2];
+        }
       }
 
       void
@@ -227,6 +262,10 @@ namespace NSB
         m_is_executing = false;
         m_T_start = -1.;
         m_sent_termination = false;
+
+        m_barycenter_estimate.x = NAN;
+        m_barycenter_estimate.y = NAN;
+        m_barycenter_estimate.z = NAN;
       }
 
       void
@@ -284,12 +323,41 @@ namespace NSB
         }
       }
 
+      inline bool
+      isBarycenterNaN(void)
+      {
+        return isNaN(m_barycenter_estimate.x) && isNaN(m_barycenter_estimate.y) && isNaN(m_barycenter_estimate.z);
+      }
+
+      void
+      consume(const IMC::NSBMsg* msg)
+      {
+        //debug("Received NSB message from %u", msg->getSource());
+        if (!isBarycenterNaN() && (msg->getSource() != getSystemId()))
+        {
+          //debug("Performing consensus with %s", resolveSystemId(msg->getSource()));
+          m_path_parameter += m_nsb_parameters.k_consensus * (msg->path_param - m_path_parameter);
+
+          m_barycenter_estimate.x += m_nsb_parameters.k_consensus * (msg->x - m_barycenter_estimate.x);
+          m_barycenter_estimate.y += m_nsb_parameters.k_consensus * (msg->y - m_barycenter_estimate.y);
+          m_barycenter_estimate.z += m_nsb_parameters.k_consensus * (msg->z - m_barycenter_estimate.z);
+        }
+      }
+
       void
       consume(const IMC::EstimatedState* msg)
       {
         if (isActive())
         {
+          if (isBarycenterNaN())
+          {
+            m_barycenter_estimate.x = msg->x;
+            m_barycenter_estimate.y = msg->y;
+            m_barycenter_estimate.z = msg->depth;
+          }
+
           GeometricPath::PathReference path_ref = m_path.getPathReference(m_path_parameter);
+          debug("kappa %f, iota %f", path_ref.kappa, path_ref.iota);
 
           // Dispatch path reference
           m_path_ref.param = m_path_parameter;
@@ -300,30 +368,66 @@ namespace NSB
           m_path_ref.psi = path_ref.psi;
           dispatch(m_path_ref);
 
-          Vector3D path_err =  GeometricPath::getPathFollowingError(path_ref, msg);
-          LineOfSight::LineOfSightOutput out = m_los.step(path_ref, path_err);
-          double delta_t = m_last_step.getDelta();
-          if (delta_t > 0.)
-            m_path_parameter += delta_t * out.path_parameter_derivative;
+          // Path-following task
+          double lat_barycenter = msg->lat;
+          double lon_barycenter = msg->lon;
+          WGS84::displace(m_barycenter_estimate.x, m_barycenter_estimate.y, &lat_barycenter, &lon_barycenter);
+          Vector3D path_err =  GeometricPath::getPathFollowingError(path_ref, lat_barycenter, lon_barycenter, m_barycenter_estimate.z);
+          LineOfSight::LineOfSightOutput los_out = m_los.step(path_ref, path_err);
 
-          m_linstate.vx = out.velocity.x;
-          m_linstate.vy = out.velocity.y;
-          m_linstate.vz = out.velocity.z;
+          m_linstate.vx = los_out.velocity.x;
+          m_linstate.vy = los_out.velocity.y;
+          m_linstate.vz = los_out.velocity.z;
+
+          // Formation-keeping task
+          // formation-keeping variable
+          // definition: sigma = vehicle_position - barycenter_position
+          Vector3D sigma;
+          sigma.x = msg->x - m_barycenter_estimate.x;
+          sigma.y = msg->y - m_barycenter_estimate.y;
+          sigma.z = msg->depth - m_barycenter_estimate.z;
+
+          Vector3D form_out = m_form.step(path_ref, sigma, los_out.path_parameter_derivative);
+
+          // Dispatch the velocity reference
+          m_linstate.vx += form_out.x;
+          m_linstate.vy += form_out.y;
+          m_linstate.vz += form_out.z;
           dispatch(m_linstate);
 
-          if (m_T_stop > 0.) // check for time-based termination
+          // Update NSB variables
+          double delta_t = m_last_step.getDelta();
+          if (delta_t > 0.)
+          {
+            m_path_parameter += delta_t * los_out.path_parameter_derivative;
+            double speed_ratio = std::sqrt((square(msg->u) + square(msg->v) + square(msg->w))
+                    / (square(m_linstate.vx) + square(m_linstate.vy) + square(m_linstate.vz)));
+            m_barycenter_estimate.x += delta_t * los_out.velocity.x * speed_ratio;
+            m_barycenter_estimate.y += delta_t * los_out.velocity.y * speed_ratio;
+            m_barycenter_estimate.z += delta_t * los_out.velocity.z * speed_ratio;
+          }
+
+          m_nsb_msg.path_param = m_path_parameter;
+          m_nsb_msg.x = m_barycenter_estimate.x;
+          m_nsb_msg.y = m_barycenter_estimate.y;
+          m_nsb_msg.z = m_barycenter_estimate.z;
+          m_nsb_msg.setDestination(getSystemId());
+          m_nsb_msg.setDestinationEntity(resolveEntity("NSB Message Transport"));
+          dispatch(m_nsb_msg);
+
+          if (m_nsb_parameters.m_T_stop > 0.) // check for time-based termination
           {
             if (m_T_start < 0.) // first-time step -- get current timestamp
               m_T_start = Time::Clock::get();
-            else if ((Time::Clock::get() - m_T_start >= m_T_stop) && !m_sent_termination)
+            else if ((Time::Clock::get() - m_T_start >= m_nsb_parameters.m_T_stop) && !m_sent_termination)
             {
               debug("Reached experiment termination time.");
               terminateExperiment(path_ref.lat, path_ref.lon);
             }            
           }
-          if (m_param_stop > 0.) // check for parameter-based termination
+          if (m_nsb_parameters.m_param_stop > 0.) // check for parameter-based termination
           {
-            if ((m_path_parameter > m_param_stop) && !m_sent_termination)
+            if ((m_path_parameter > m_nsb_parameters.m_param_stop) && !m_sent_termination)
             {
               debug("Reached experiment termination parameter.");
               terminateExperiment(path_ref.lat, path_ref.lon);

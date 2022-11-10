@@ -69,6 +69,10 @@ namespace DUNE
       if (m_rl.filter(msg))
         return;
 
+      //! Only transport own messages (this will probably break something else)
+      if (msg->getSource() != getSystemId())
+        return;
+
       unsigned int n = msg->getSerializationSize();
 
       m_buf.grow(n);
