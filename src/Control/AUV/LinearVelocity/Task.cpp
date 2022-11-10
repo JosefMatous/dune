@@ -87,10 +87,10 @@ namespace Control
           has_valid_reference = false;
 
           param("Course PID Gains", m_course_gains)
-            .defaultValue("15, 0, 0")
+            .defaultValue("10, 0.1, 0")
             .size(3);
           param("Course PID Integral Limit", m_course_limit)
-            .defaultValue("-1");
+            .defaultValue("5");
           param("Vertical PID Gains", m_z_rate_gains)
             .defaultValue("1, 0.05, 0")
             .size(3);
