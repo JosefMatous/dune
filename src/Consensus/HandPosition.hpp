@@ -32,6 +32,7 @@
 
 // DUNE headers.
 #include <DUNE/DUNE.hpp>
+#include "Utility.hpp"
 
 namespace Consensus
 {
@@ -52,6 +53,18 @@ namespace Consensus
     destination->y = estate->y + h*s_psi;
     destination->x_dot = estate->u*c_psi - estate->v*s_psi - h*s_psi*estate->r;
     destination->y_dot = estate->u*s_psi + estate->v*c_psi + h*c_psi*estate->r;
+  }
+
+  inline void
+  hand_velocity_controller(const Vector2D* v_d, const IMC::EstimatedState* estate, float h, float U_max, IMC::DesiredSpeed* u_ref, IMC::DesiredHeadingRate* r_ref)
+  {
+    float c_psi = std::cos(estate->psi);
+    float s_psi = std::sin(estate->psi);
+
+    u_ref->value = trimValue(v_d->x*c_psi + v_d->y*s_psi, 0., U_max);
+    u_ref->speed_units = IMC::SUNITS_METERS_PS;
+
+    r_ref->value = (v_d->y*c_psi - v_d->x*s_psi - estate->v) / h;
   }
 }
 

@@ -32,16 +32,12 @@
 
 // DUNE headers.
 #include <DUNE/DUNE.hpp>
+#include "Utility.hpp"
 #include "HandPosition.hpp"
 
 namespace Consensus
 {
   using DUNE_NAMESPACES;
-
-  struct Vector2D
-  {
-    float x, y;
-  };
 
   inline void
   constraint_gradient(const Vector2D* z, const Vector2D* z_d, float d_min, float d_max, Vector2D* g)
@@ -75,10 +71,6 @@ namespace Consensus
 
     Vector2D dW; // constraint gradient
     constraint_gradient(&z, z_d, d_min, d_max, &dW);
-
-    Vector2D z_e; // formation error
-    z_e.x = z.x - z_d->x;
-    z_e.y = z.y - z_d->y;
 
     u->x = c*(z_d->x - z.x) - c*rho*dW.x + h_target->x_dot;
     u->y = c*(z_d->y - z.y) - c*rho*dW.y + h_target->y_dot;

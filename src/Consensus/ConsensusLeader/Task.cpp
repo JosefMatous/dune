@@ -29,7 +29,9 @@
 
 // DUNE headers.
 #include <DUNE/DUNE.hpp>
+#include "../Utility.hpp"
 #include "../EdgeConsensus.hpp"
+#include "../HandPosition.hpp"
 
 namespace Consensus
 {
@@ -41,6 +43,8 @@ namespace Consensus
   {
     using DUNE_NAMESPACES;
 
+    //! Required control loops
+    static const uint32_t c_required = IMC::CL_SPEED | IMC::CL_YAW_RATE;    
 
     struct Task: public DUNE::Tasks::Task
     {
@@ -62,11 +66,21 @@ namespace Consensus
         float U_max;
       } m_params;
 
+      Vector2D m_hand_velocity_reference;
       IMC::DesiredHeadingRate m_yaw_rate;
       IMC::DesiredSpeed m_speed;
 
+      //! Control loops last reference
+      uint32_t m_scope_ref;
+      //! Active loops
+      uint32_t m_aloops;
+      IMC::ControlLoops m_cloops;
+
       HandPosition m_own_hand;
+      IMC::EstimatedState m_estate;
       HandPosition m_target_hand;
+
+      bool is_initialized; // task has received EstimatedState
 
       //! Constructor.
       //! @param[in] name task name.
@@ -74,6 +88,8 @@ namespace Consensus
       Task(const std::string& name, Tasks::Context& ctx):
         DUNE::Tasks::Task(name, ctx)
       {
+        // Initialize main entity state.
+        setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_IDLE);
         bind<IMC::EstimatedState>(this);
         bind<IMC::Target>(this);
 
@@ -93,19 +109,97 @@ namespace Consensus
           .defaultValue("50");
         param("Maximum Speed Reference", m_params.U_max)
           .defaultValue("2");
+
+        is_initialized = false;
+      }
+
+      //! Update internal parameters.
+      void
+      onUpdateParameters(void)
+      {
+        reset();
+      }
+
+      void
+      onActivation(void)
+      {
+        setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_ACTIVE);
+        reset();
+
+        // Activate control loops
+        if ((c_required & m_aloops) == c_required)
+          return;
+
+        m_aloops |= c_required;
+        m_cloops.enable = IMC::ControlLoops::CL_ENABLE;
+        m_cloops.mask = c_required;
+        m_cloops.scope_ref = m_scope_ref;
+        dispatch(m_cloops);
+      }
+
+      void
+      onDeactivation(void)
+      {
+        setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_IDLE);
+        reset();
+
+        // Deactivate control loops
+        if ((c_required & ~m_aloops) == c_required)
+          return;
+
+        m_aloops &= ~c_required;
+        m_cloops.enable = IMC::ControlLoops::CL_DISABLE;
+        m_cloops.mask = c_required;
+        m_cloops.scope_ref = m_scope_ref;
+        dispatch(m_cloops);
+      }
+
+      void
+      onResourceInitialization(void)
+      {
+        requestDeactivation();
+
+        reset();
+      }
+
+      void
+      reset(void)
+      {
+        is_initialized = false;
       }
 
       void
       consume(const IMC::EstimatedState* msg)
       {
-        get_hand_position(msg, m_params.h, &m_own_hand);
+        if (isActive())
+        {
+          get_hand_position(msg, m_params.h, &m_own_hand);
+          m_estate.lat = msg->lat;
+          m_estate.lon = msg->lon;
+          m_estate.psi = msg->psi;
+          m_estate.v = msg->v;
+          is_initialized = true;
+          debug("Processing estate");
+        }
       }
 
       void
       consume(const IMC::Target* msg)
       {
-        float z_dummy;
-        //WGS84::displacement()
+        if (isActive() && is_initialized)
+        {
+          float z_dummy;
+          WGS84::displacement(m_estate.lat, m_estate.lon, 0., msg->lat, msg->lon, 0., &m_target_hand.x, &m_target_hand.y, &z_dummy);
+          m_target_hand.x_dot = msg->sog * std::cos(msg->cog);
+          m_target_hand.y_dot = msg->sog * std::sin(msg->cog);
+
+          edge_consensus(&m_own_hand, &m_target_hand, &m_params.offset, m_params.c, m_params.rho, m_params.d_min, m_params.d_max, &m_hand_velocity_reference);
+          hand_velocity_controller(&m_hand_velocity_reference, &m_estate, m_params.h, m_params.U_max, &m_speed, &m_yaw_rate);
+
+          dispatch(m_speed);
+          dispatch(m_yaw_rate);
+          debug("Dispatching references");
+        }
       }
 
       //! Main loop.

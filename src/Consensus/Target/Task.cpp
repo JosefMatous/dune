@@ -70,8 +70,6 @@ namespace Consensus
       Task(const std::string& name, Tasks::Context& ctx):
         DUNE::Tasks::Periodic(name, ctx)
       {
-        bind<IMC::EstimatedState>(this);
-
         param("Speed", m_params.U)
           .defaultValue("0.8");
         param("Radiues", m_params.r)
@@ -108,6 +106,7 @@ namespace Consensus
       void
       reset(void)
       {
+        debug("Target reset");
         m_phi = 0.;
       }
 
@@ -129,6 +128,7 @@ namespace Consensus
         m_message.lat = m_params.lat;
         m_message.lon = m_params.lon;
         WGS84::displace(x, y, &m_message.lat, &m_message.lon);
+        debug("Target at %f, %f", m_message.lat, m_message.lon);
 
         dispatch(m_message);
 
