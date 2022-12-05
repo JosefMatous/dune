@@ -24,37 +24,65 @@
 // https://github.com/LSTS/dune/blob/master/LICENCE.md and                  *
 // http://ec.europa.eu/idabc/eupl.html.                                     *
 //***************************************************************************
-// Author: Ricardo Martins                                                  *
-//***************************************************************************
-// Automatically generated.                                                 *
-//***************************************************************************
-// IMC XML MD5: 81a231ec258c74d260a4ec19beafc2c1                            *
+// Author: Josef Matous                                                     *
 //***************************************************************************
 
-#ifndef DUNE_IMC_CONSTANTS_HPP_INCLUDED_
-#define DUNE_IMC_CONSTANTS_HPP_INCLUDED_
+#ifndef CONSENSUS_EDGECONSENSUS_HPP
+#define CONSENSUS_EDGECONSENSUS_HPP
 
-//! IMC version string.
-#define DUNE_IMC_CONST_VERSION "5.4.30"
-//! Git repository information.
-#define DUNE_IMC_CONST_GIT_INFO "2022-12-05 d86853e  (HEAD -> master, origin/master, origin/HEAD)"
-//! MD5 sum of XML specification file.
-#define DUNE_IMC_CONST_MD5 "81a231ec258c74d260a4ec19beafc2c1"
-//! Synchronization number.
-#define DUNE_IMC_CONST_SYNC 0xFE54
-//! Reversed synchronization number.
-#define DUNE_IMC_CONST_SYNC_REV 0x54FE
-//! Size of the header in bytes.
-#define DUNE_IMC_CONST_HEADER_SIZE 20
-//! Size of the footer in bytes.
-#define DUNE_IMC_CONST_FOOTER_SIZE 2
-//! Identification number of the null message.
-#define DUNE_IMC_CONST_NULL_ID 65535
-//! Maximum message data size.
-#define DUNE_IMC_CONST_MAX_SIZE 65535
-//! Unknown entity identifier.
-#define DUNE_IMC_CONST_UNK_EID 255
-//! System entity identifier.
-#define DUNE_IMC_CONST_SYS_EID 0
+// DUNE headers.
+#include <DUNE/DUNE.hpp>
+#include "HandPosition.hpp"
+
+namespace Consensus
+{
+  using DUNE_NAMESPACES;
+
+  struct Vector2D
+  {
+    float x, y;
+  };
+
+  inline void
+  constraint_gradient(const Vector2D* z, const Vector2D* z_d, float d_min, float d_max, Vector2D* g)
+  {
+    Vector2D z_e;
+    z_e.x = z->x - z_d->x;
+    z_e.y = z->y - z_d->y;
+
+    float z_norm_sq = z->x*z->x + z->y*z->y;
+    float z_d_norm_sq = z_d->x*z_d->x + z_d->y*z_d->y;
+
+    float d_min_sq = d_min*d_min;
+    float d_max_sq = d_max*d_max;
+
+    float k1 = d_min_sq / (z_d_norm_sq * (z_d_norm_sq - d_min_sq));
+    float k2 = 1 / (d_max_sq - z_d_norm_sq);
+
+    float denominator_max = d_max_sq - z_norm_sq;
+    float denominator_min = z_norm_sq - d_min_sq;
+
+    g->x = z_e.x + k1*z->x/denominator_max - k2*z->x*d_min_sq/(denominator_min*z_norm_sq);
+    g->y = z_e.y + k1*z->y/denominator_max - k2*z->y*d_min_sq/(denominator_min*z_norm_sq);
+  }
+  
+  inline void
+  edge_consensus(const HandPosition* h_self, const HandPosition* h_target, const Vector2D* z_d, float c, float rho, float d_min, float d_max, Vector2D* u)
+  {
+    Vector2D z; // relative position
+    z.x = h_self->x - h_target->x;
+    z.y = h_self->y - h_target->y;
+
+    Vector2D dW; // constraint gradient
+    constraint_gradient(&z, z_d, d_min, d_max, &dW);
+
+    Vector2D z_e; // formation error
+    z_e.x = z.x - z_d->x;
+    z_e.y = z.y - z_d->y;
+
+    u->x = c*(z_d->x - z.x) - c*rho*dW.x + h_target->x_dot;
+    u->y = c*(z_d->y - z.y) - c*rho*dW.y + h_target->y_dot;
+  }
+}
 
 #endif

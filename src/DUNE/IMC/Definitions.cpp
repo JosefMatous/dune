@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 1239d4aa114d6003933998370bda84ea                            *
+// IMC XML MD5: 81a231ec258c74d260a4ec19beafc2c1                            *
 //***************************************************************************
 
 // ISO C++ 98 headers.
@@ -28068,38 +28068,34 @@ namespace DUNE
       IMC::toJSON(os__, "reason", reason, nindent__);
     }
 
-    CurvedPathReference::CurvedPathReference(void)
+    ConsensusPacket::ConsensusPacket(void)
     {
-      m_header.mgid = 2021;
+      m_header.mgid = 2020;
       clear();
     }
 
     void
-    CurvedPathReference::clear(void)
+    ConsensusPacket::clear(void)
     {
-      param = 0;
       lat = 0;
       lon = 0;
-      z = 0;
-      theta = 0;
-      psi = 0;
+      v_x = 0;
+      v_y = 0;
     }
 
     bool
-    CurvedPathReference::fieldsEqual(const Message& msg__) const
+    ConsensusPacket::fieldsEqual(const Message& msg__) const
     {
-      const IMC::CurvedPathReference& other__ = static_cast<const CurvedPathReference&>(msg__);
-      if (param != other__.param) return false;
+      const IMC::ConsensusPacket& other__ = static_cast<const ConsensusPacket&>(msg__);
       if (lat != other__.lat) return false;
       if (lon != other__.lon) return false;
-      if (z != other__.z) return false;
-      if (theta != other__.theta) return false;
-      if (psi != other__.psi) return false;
+      if (v_x != other__.v_x) return false;
+      if (v_y != other__.v_y) return false;
       return true;
     }
 
     int
-    CurvedPathReference::validate(void) const
+    ConsensusPacket::validate(void) const
     {
       if (lat < -1.5707963267948966 || lat > 1.5707963267948966) return false;
       if (lon < -3.141592653589793 || lon > 3.141592653589793) return false;
@@ -28107,127 +28103,45 @@ namespace DUNE
     }
 
     uint8_t*
-    CurvedPathReference::serializeFields(uint8_t* bfr__) const
+    ConsensusPacket::serializeFields(uint8_t* bfr__) const
     {
       uint8_t* ptr__ = bfr__;
-      ptr__ += IMC::serialize(param, ptr__);
       ptr__ += IMC::serialize(lat, ptr__);
       ptr__ += IMC::serialize(lon, ptr__);
-      ptr__ += IMC::serialize(z, ptr__);
-      ptr__ += IMC::serialize(theta, ptr__);
-      ptr__ += IMC::serialize(psi, ptr__);
+      ptr__ += IMC::serialize(v_x, ptr__);
+      ptr__ += IMC::serialize(v_y, ptr__);
       return ptr__;
     }
 
     uint16_t
-    CurvedPathReference::deserializeFields(const uint8_t* bfr__, uint16_t size__)
+    ConsensusPacket::deserializeFields(const uint8_t* bfr__, uint16_t size__)
     {
       const uint8_t* start__ = bfr__;
-      bfr__ += IMC::deserialize(param, bfr__, size__);
       bfr__ += IMC::deserialize(lat, bfr__, size__);
       bfr__ += IMC::deserialize(lon, bfr__, size__);
-      bfr__ += IMC::deserialize(z, bfr__, size__);
-      bfr__ += IMC::deserialize(theta, bfr__, size__);
-      bfr__ += IMC::deserialize(psi, bfr__, size__);
+      bfr__ += IMC::deserialize(v_x, bfr__, size__);
+      bfr__ += IMC::deserialize(v_y, bfr__, size__);
       return bfr__ - start__;
     }
 
     uint16_t
-    CurvedPathReference::reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__)
+    ConsensusPacket::reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__)
     {
       const uint8_t* start__ = bfr__;
-      bfr__ += IMC::reverseDeserialize(param, bfr__, size__);
       bfr__ += IMC::reverseDeserialize(lat, bfr__, size__);
       bfr__ += IMC::reverseDeserialize(lon, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(z, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(theta, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(psi, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(v_x, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(v_y, bfr__, size__);
       return bfr__ - start__;
     }
 
     void
-    CurvedPathReference::fieldsToJSON(std::ostream& os__, unsigned nindent__) const
+    ConsensusPacket::fieldsToJSON(std::ostream& os__, unsigned nindent__) const
     {
-      IMC::toJSON(os__, "param", param, nindent__);
       IMC::toJSON(os__, "lat", lat, nindent__);
       IMC::toJSON(os__, "lon", lon, nindent__);
-      IMC::toJSON(os__, "z", z, nindent__);
-      IMC::toJSON(os__, "theta", theta, nindent__);
-      IMC::toJSON(os__, "psi", psi, nindent__);
-    }
-
-    NSBMsg::NSBMsg(void)
-    {
-      m_header.mgid = 2022;
-      clear();
-    }
-
-    void
-    NSBMsg::clear(void)
-    {
-      path_param = 0;
-      x = 0;
-      y = 0;
-      z = 0;
-    }
-
-    bool
-    NSBMsg::fieldsEqual(const Message& msg__) const
-    {
-      const IMC::NSBMsg& other__ = static_cast<const NSBMsg&>(msg__);
-      if (path_param != other__.path_param) return false;
-      if (x != other__.x) return false;
-      if (y != other__.y) return false;
-      if (z != other__.z) return false;
-      return true;
-    }
-
-    int
-    NSBMsg::validate(void) const
-    {
-      return true;
-    }
-
-    uint8_t*
-    NSBMsg::serializeFields(uint8_t* bfr__) const
-    {
-      uint8_t* ptr__ = bfr__;
-      ptr__ += IMC::serialize(path_param, ptr__);
-      ptr__ += IMC::serialize(x, ptr__);
-      ptr__ += IMC::serialize(y, ptr__);
-      ptr__ += IMC::serialize(z, ptr__);
-      return ptr__;
-    }
-
-    uint16_t
-    NSBMsg::deserializeFields(const uint8_t* bfr__, uint16_t size__)
-    {
-      const uint8_t* start__ = bfr__;
-      bfr__ += IMC::deserialize(path_param, bfr__, size__);
-      bfr__ += IMC::deserialize(x, bfr__, size__);
-      bfr__ += IMC::deserialize(y, bfr__, size__);
-      bfr__ += IMC::deserialize(z, bfr__, size__);
-      return bfr__ - start__;
-    }
-
-    uint16_t
-    NSBMsg::reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__)
-    {
-      const uint8_t* start__ = bfr__;
-      bfr__ += IMC::reverseDeserialize(path_param, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(x, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(y, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(z, bfr__, size__);
-      return bfr__ - start__;
-    }
-
-    void
-    NSBMsg::fieldsToJSON(std::ostream& os__, unsigned nindent__) const
-    {
-      IMC::toJSON(os__, "path_param", path_param, nindent__);
-      IMC::toJSON(os__, "x", x, nindent__);
-      IMC::toJSON(os__, "y", y, nindent__);
-      IMC::toJSON(os__, "z", z, nindent__);
+      IMC::toJSON(os__, "v_x", v_x, nindent__);
+      IMC::toJSON(os__, "v_y", v_y, nindent__);
     }
   }
 }

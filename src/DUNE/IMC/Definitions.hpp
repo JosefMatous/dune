@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 1239d4aa114d6003933998370bda84ea                            *
+// IMC XML MD5: 81a231ec258c74d260a4ec19beafc2c1                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_DEFINITIONS_HPP_INCLUDED_
@@ -26563,35 +26563,31 @@ namespace DUNE
       fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
     };
 
-    //! Curved Path Reference.
-    class CurvedPathReference: public Message
+    //! Consensus Packet.
+    class ConsensusPacket: public Message
     {
     public:
-      //! Path Parameter.
-      fp64_t param;
-      //! Latitude (WGS-84).
+      //! Latitude WGS-84.
       fp64_t lat;
-      //! Longitude (WGS-84).
+      //! Longitude WGS-84.
       fp64_t lon;
-      //! Depth.
-      fp64_t z;
-      //! Pitch angle.
-      fp64_t theta;
-      //! Yaw angle.
-      fp64_t psi;
+      //! Velocity x.
+      fp32_t v_x;
+      //! Velocity y.
+      fp32_t v_y;
 
       static uint16_t
       getIdStatic(void)
       {
-        return 2021;
+        return 2020;
       }
 
-      CurvedPathReference(void);
+      ConsensusPacket(void);
 
-      CurvedPathReference*
+      ConsensusPacket*
       clone(void) const
       {
-        return new CurvedPathReference(*this);
+        return new ConsensusPacket(*this);
       }
 
       void
@@ -26615,86 +26611,19 @@ namespace DUNE
       uint16_t
       getId(void) const
       {
-        return CurvedPathReference::getIdStatic();
+        return ConsensusPacket::getIdStatic();
       }
 
       const char*
       getName(void) const
       {
-        return "CurvedPathReference";
+        return "ConsensusPacket";
       }
 
       unsigned
       getFixedSerializationSize(void) const
       {
-        return 48;
-      }
-
-      void
-      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
-    };
-
-    //! NSB Message.
-    class NSBMsg: public Message
-    {
-    public:
-      //! Path Parameter.
-      fp64_t path_param;
-      //! Barycenter x.
-      fp64_t x;
-      //! Barycenter y.
-      fp64_t y;
-      //! Barycenter z.
-      fp64_t z;
-
-      static uint16_t
-      getIdStatic(void)
-      {
-        return 2022;
-      }
-
-      NSBMsg(void);
-
-      NSBMsg*
-      clone(void) const
-      {
-        return new NSBMsg(*this);
-      }
-
-      void
-      clear(void);
-
-      bool
-      fieldsEqual(const Message& msg__) const;
-
-      int
-      validate(void) const;
-
-      uint8_t*
-      serializeFields(uint8_t* bfr__) const;
-
-      uint16_t
-      deserializeFields(const uint8_t* bfr__, uint16_t size__);
-
-      uint16_t
-      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
-
-      uint16_t
-      getId(void) const
-      {
-        return NSBMsg::getIdStatic();
-      }
-
-      const char*
-      getName(void) const
-      {
-        return "NSBMsg";
-      }
-
-      unsigned
-      getFixedSerializationSize(void) const
-      {
-        return 32;
+        return 24;
       }
 
       void

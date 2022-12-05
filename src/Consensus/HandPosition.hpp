@@ -24,37 +24,35 @@
 // https://github.com/LSTS/dune/blob/master/LICENCE.md and                  *
 // http://ec.europa.eu/idabc/eupl.html.                                     *
 //***************************************************************************
-// Author: Ricardo Martins                                                  *
-//***************************************************************************
-// Automatically generated.                                                 *
-//***************************************************************************
-// IMC XML MD5: 81a231ec258c74d260a4ec19beafc2c1                            *
+// Author: Josef Matous                                                     *
 //***************************************************************************
 
-#ifndef DUNE_IMC_CONSTANTS_HPP_INCLUDED_
-#define DUNE_IMC_CONSTANTS_HPP_INCLUDED_
+#ifndef CONSENSUS_HAND_POSITION_HPP
+#define CONSENSUS_HAND_POSITION_HPP
 
-//! IMC version string.
-#define DUNE_IMC_CONST_VERSION "5.4.30"
-//! Git repository information.
-#define DUNE_IMC_CONST_GIT_INFO "2022-12-05 d86853e  (HEAD -> master, origin/master, origin/HEAD)"
-//! MD5 sum of XML specification file.
-#define DUNE_IMC_CONST_MD5 "81a231ec258c74d260a4ec19beafc2c1"
-//! Synchronization number.
-#define DUNE_IMC_CONST_SYNC 0xFE54
-//! Reversed synchronization number.
-#define DUNE_IMC_CONST_SYNC_REV 0x54FE
-//! Size of the header in bytes.
-#define DUNE_IMC_CONST_HEADER_SIZE 20
-//! Size of the footer in bytes.
-#define DUNE_IMC_CONST_FOOTER_SIZE 2
-//! Identification number of the null message.
-#define DUNE_IMC_CONST_NULL_ID 65535
-//! Maximum message data size.
-#define DUNE_IMC_CONST_MAX_SIZE 65535
-//! Unknown entity identifier.
-#define DUNE_IMC_CONST_UNK_EID 255
-//! System entity identifier.
-#define DUNE_IMC_CONST_SYS_EID 0
+// DUNE headers.
+#include <DUNE/DUNE.hpp>
+
+namespace Consensus
+{
+  using DUNE_NAMESPACES;
+
+  struct HandPosition
+  {
+    float x, y, x_dot, y_dot;
+  };
+  
+  //! Calculates hand position from estimated state
+  inline void 
+  get_hand_position(const IMC::EstimatedState* estate, float h, HandPosition* destination)
+  {
+    float c_psi = std::cos(estate->psi);
+    float s_psi = std::sin(estate->psi);
+    destination->x = estate->x + h*c_psi;
+    destination->y = estate->y + h*s_psi;
+    destination->x_dot = estate->u*c_psi - estate->v*s_psi - h*s_psi*estate->r;
+    destination->y_dot = estate->u*s_psi + estate->v*c_psi + h*c_psi*estate->r;
+  }
+}
 
 #endif
