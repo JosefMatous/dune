@@ -56,7 +56,7 @@ namespace Consensus
   }
 
   inline void
-  hand_velocity_controller(const Vector2D* v_d, const IMC::EstimatedState* estate, float h, float U_max, IMC::DesiredSpeed* u_ref, IMC::DesiredHeadingRate* r_ref)
+  hand_velocity_controller(const Vector2D* v_d, const IMC::EstimatedState* estate, float h, float U_max, float r_max, IMC::DesiredSpeed* u_ref, IMC::DesiredHeadingRate* r_ref)
   {
     float c_psi = std::cos(estate->psi);
     float s_psi = std::sin(estate->psi);
@@ -64,7 +64,7 @@ namespace Consensus
     u_ref->value = trimValue(v_d->x*c_psi + v_d->y*s_psi, 0., U_max);
     u_ref->speed_units = IMC::SUNITS_METERS_PS;
 
-    r_ref->value = (v_d->y*c_psi - v_d->x*s_psi - estate->v) / h;
+    r_ref->value = trimValue((v_d->y*c_psi - v_d->x*s_psi - estate->v) / h, -r_max, r_max);
   }
 }
 

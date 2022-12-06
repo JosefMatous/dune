@@ -64,6 +64,8 @@ namespace Consensus
         float d_max;
         //! Maximum velocity reference
         float U_max;
+        //! Maximum yaw rate reference
+        float r_max;
         //! Leader name
         std::string leader_name;
         //! Leader node ID
@@ -94,9 +96,9 @@ namespace Consensus
         param("Hand Length", m_params.h)
           .defaultValue("1");
         param("Formation Keeping Gain", m_params.c)
-          .defaultValue("0.5");
+          .defaultValue("0.1");
         param("Constraint Gain", m_params.rho)
-          .defaultValue("0.5");
+          .defaultValue("0.05");
         param("Formation Offset x", m_params.offset.x)
           .defaultValue("0");
         param("Formation Offset y", m_params.offset.y)
@@ -111,6 +113,8 @@ namespace Consensus
           .defaultValue("false");
         param("Leader", m_params.leader_name)
           .defaultValue("lauv-simulator-1");
+        param("Maximum Yaw Rate", m_params.r_max)
+          .defaultValue("1");
 
         is_initialized = false;
         m_z_ref.value = 0;
@@ -179,7 +183,7 @@ namespace Consensus
           m_hand_velocity_reference.x = x_rel * xy_norm_inv;
           m_hand_velocity_reference.y = y_rel * xy_norm_inv;
 
-          hand_velocity_controller(&m_hand_velocity_reference, &state, m_params.h, m_params.U_max, &m_speed, &m_yaw_rate);
+          hand_velocity_controller(&m_hand_velocity_reference, &state, m_params.h, m_params.U_max, m_params.r_max, &m_speed, &m_yaw_rate);
           //dispatch(m_speed); // speed is handled by the PathController class by default -- no need to dispatch
           dispatch(m_yaw_rate);
           dispatch(m_z_ref);
@@ -212,7 +216,7 @@ namespace Consensus
           m_target_hand.y_dot = msg->v_y;
 
           edge_consensus(&m_own_hand, &m_target_hand, &m_params.offset, m_params.c, m_params.rho, m_params.d_min, m_params.d_max, &m_hand_velocity_reference);
-          hand_velocity_controller(&m_hand_velocity_reference, &m_estate, m_params.h, m_params.U_max, &m_speed, &m_yaw_rate);
+          hand_velocity_controller(&m_hand_velocity_reference, &m_estate, m_params.h, m_params.U_max, m_params.r_max, &m_speed, &m_yaw_rate);
 
           dispatch(m_speed);
           dispatch(m_yaw_rate);
