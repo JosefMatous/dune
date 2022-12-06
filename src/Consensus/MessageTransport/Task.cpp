@@ -65,6 +65,8 @@ namespace Consensus
       HandPosition m_hand;
       IMC::ConsensusPacket m_message;
 
+      bool m_active;
+
       //! Constructor.
       //! @param[in] name task name.
       //! @param[in] ctx context.
@@ -79,6 +81,8 @@ namespace Consensus
           .defaultValue("-1");
         param("Hand Length", m_params.h)
           .defaultValue("1");
+        param("Active", m_active)
+          .defaultValue("false");
         reset();
       }
 
@@ -98,6 +102,10 @@ namespace Consensus
       onUpdateParameters(void)
       {
         reset();
+        if (m_active != isActive())
+        {
+          m_active ? requestActivation() : requestDeactivation();
+        }
       }
 
       void
@@ -110,6 +118,8 @@ namespace Consensus
       void
       consume(const IMC::EstimatedState* msg)
       {
+        if (isActive())
+        {
           //debug("Consuming NSB message");
           m_sample_counter += 1;
           if (m_last_timestep < 0)
@@ -126,6 +136,7 @@ namespace Consensus
               create_packet(msg);              
             }
           }
+        }
       }
 
       inline void

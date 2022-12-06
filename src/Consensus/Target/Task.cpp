@@ -133,7 +133,7 @@ namespace Consensus
       reset(void)
       {
         debug("Target reset");
-        m_phi = 0.;
+        m_phi = m_params.phi0;
       }
 
       //! Main loop.
