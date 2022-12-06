@@ -64,12 +64,16 @@ namespace Consensus
 
       IMC::Target m_message;
 
+      bool m_active;
+
       //! Constructor.
       //! @param[in] name task name.
       //! @param[in] ctx context.
       Task(const std::string& name, Tasks::Context& ctx):
         DUNE::Tasks::Periodic(name, ctx)
       {
+        setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_IDLE);
+
         param("Speed", m_params.U)
           .defaultValue("0.8");
         param("Radiues", m_params.r)
@@ -82,24 +86,46 @@ namespace Consensus
           .defaultValue("0");
         param("Direction", m_params.direction)
           .defaultValue("true");
+        param("Active", m_active)
+          .defaultValue("false");
+
         reset();
+      }
+
+      //! Update internal parameters.
+      void
+      onUpdateParameters(void)
+      {
+        if (m_active)
+        {
+          requestActivation();
+        } else
+        {
+          requestDeactivation();
+        }
       }
 
       void
       onActivation(void)
       {
         reset();
+
+        setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_ACTIVE);
       }
 
       void
       onDeactivation(void)
       {
+        setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_IDLE);
+
         reset();
       }
 
       void
-      onUpdateParameters(void)
+      onResourceInitialization(void)
       {
+        requestDeactivation();
+
         reset();
       }
 
@@ -114,25 +140,28 @@ namespace Consensus
       void
       task(void)
       {
-        double dir = m_params.direction ? 1. : -1;
-        double c_phi = std::cos(m_phi);
-        double s_phi = std::sin(m_phi);
-        double x = m_params.r * c_phi;
-        double y = m_params.r * s_phi;
-        double heading = Angles::normalizeRadian(m_phi + dir*M_PI_2);
+        if (isActive())
+        {
+          double dir = m_params.direction ? 1. : -1;
+          double c_phi = std::cos(m_phi);
+          double s_phi = std::sin(m_phi);
+          double x = m_params.r * c_phi;
+          double y = m_params.r * s_phi;
+          double heading = Angles::normalizeRadian(m_phi + dir*M_PI_2);
 
-        m_message.label = "virtual_leader";
-        m_message.sog = m_params.U;
-        m_message.cog = heading;
+          m_message.label = "virtual_leader";
+          m_message.sog = m_params.U;
+          m_message.cog = heading;
 
-        m_message.lat = m_params.lat;
-        m_message.lon = m_params.lon;
-        WGS84::displace(x, y, &m_message.lat, &m_message.lon);
-        debug("Target at %f, %f", m_message.lat, m_message.lon);
+          m_message.lat = m_params.lat;
+          m_message.lon = m_params.lon;
+          WGS84::displace(x, y, &m_message.lat, &m_message.lon);
+          debug("Target at %f, %f", m_message.lat, m_message.lon);
 
-        dispatch(m_message);
+          dispatch(m_message);
 
-        m_phi += dir * m_params.U / (m_params.r * getFrequency());
+          m_phi += dir * m_params.U / (m_params.r * getFrequency());
+        }
       }
     };    
   }

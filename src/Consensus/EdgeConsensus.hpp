@@ -69,11 +69,13 @@ namespace Consensus
     z.x = h_self->x - h_target->x;
     z.y = h_self->y - h_target->y;
 
-    Vector2D dW; // constraint gradient
+    /*Vector2D dW; // constraint gradient
     constraint_gradient(&z, z_d, d_min, d_max, &dW);
 
     u->x = c*(z_d->x - z.x) - c*rho*dW.x + h_target->x_dot;
-    u->y = c*(z_d->y - z.y) - c*rho*dW.y + h_target->y_dot;
+    u->y = c*(z_d->y - z.y) - c*rho*dW.y + h_target->y_dot;*/
+    u->x = c*(z_d->x - z.x) + h_target->x_dot;
+    u->y = c*(z_d->y - z.y) + h_target->y_dot;
   }
 }
 

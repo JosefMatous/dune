@@ -44,9 +44,9 @@ namespace Consensus
     using DUNE_NAMESPACES;
 
     //! Required control loops
-    static const uint32_t c_required = IMC::CL_SPEED | IMC::CL_YAW_RATE;    
+    static const uint32_t c_required = IMC::CL_SPEED | IMC::CL_YAW_RATE | IMC::CL_DEPTH;    
 
-    struct Task: public DUNE::Tasks::Task
+    struct Task: public DUNE::Control::PathController
     {
       struct 
       {
@@ -69,27 +69,21 @@ namespace Consensus
       Vector2D m_hand_velocity_reference;
       IMC::DesiredHeadingRate m_yaw_rate;
       IMC::DesiredSpeed m_speed;
-
-      //! Control loops last reference
-      uint32_t m_scope_ref;
-      //! Active loops
-      uint32_t m_aloops;
-      IMC::ControlLoops m_cloops;
+      IMC::DesiredZ m_z_ref;
 
       HandPosition m_own_hand;
       IMC::EstimatedState m_estate;
       HandPosition m_target_hand;
 
       bool is_initialized; // task has received EstimatedState
+      bool m_active; // External activation
 
       //! Constructor.
       //! @param[in] name task name.
       //! @param[in] ctx context.
       Task(const std::string& name, Tasks::Context& ctx):
-        DUNE::Tasks::Task(name, ctx)
+        DUNE::Control::PathController(name, ctx)
       {
-        // Initialize main entity state.
-        setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_IDLE);
         bind<IMC::EstimatedState>(this);
         bind<IMC::Target>(this);
 
@@ -109,77 +103,91 @@ namespace Consensus
           .defaultValue("50");
         param("Maximum Speed Reference", m_params.U_max)
           .defaultValue("2");
+        param("Active", m_active)
+          .defaultValue("false");
 
         is_initialized = false;
+        m_z_ref.value = 0;
+        m_z_ref.z_units = IMC::Z_DEPTH;
       }
 
-      //! Update internal parameters.
       void
       onUpdateParameters(void)
       {
-        reset();
+        PathController::onUpdateParameters();
+
+        if (m_active != isActive())
+        {
+          m_active ? requestActivation() : requestDeactivation();
+        }
+      }
+
+      void
+      onEntityReservation(void)
+      {
+        PathController::onEntityReservation();
+      }
+
+      void
+      onPathActivation(void)
+      {
+        enableControlLoops(c_required);
+      }
+
+      void
+      onPathDeactivation(void)
+      {
+        disableControlLoops(c_required);
       }
 
       void
       onActivation(void)
       {
-        setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_ACTIVE);
-        reset();
-
-        // Activate control loops
-        if ((c_required & m_aloops) == c_required)
-          return;
-
-        m_aloops |= c_required;
-        m_cloops.enable = IMC::ControlLoops::CL_ENABLE;
-        m_cloops.mask = c_required;
-        m_cloops.scope_ref = m_scope_ref;
-        dispatch(m_cloops);
+        enableControlLoops(c_required);
       }
 
       void
       onDeactivation(void)
       {
-        setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_IDLE);
-        reset();
+        disableControlLoops(c_required);
+      }
 
-        // Deactivate control loops
-        if ((c_required & ~m_aloops) == c_required)
-          return;
-
-        m_aloops &= ~c_required;
-        m_cloops.enable = IMC::ControlLoops::CL_DISABLE;
-        m_cloops.mask = c_required;
-        m_cloops.scope_ref = m_scope_ref;
-        dispatch(m_cloops);
+      bool
+      hasSpecificZControl(void) const
+      {
+        return true;
       }
 
       void
-      onResourceInitialization(void)
+      step(const IMC::EstimatedState& state, const TrackingState& ts)
       {
-        requestDeactivation();
+        if (is_initialized)
+        {
+          // Head straight to target
+          double x_rel = ts.end.x - m_own_hand.x;
+          double y_rel = ts.end.y - m_own_hand.y;
+          double xy_norm_inv = 1. / std::sqrt(x_rel*x_rel + y_rel*y_rel);
+          m_hand_velocity_reference.x = x_rel * xy_norm_inv;
+          m_hand_velocity_reference.y = y_rel * xy_norm_inv;
 
-        reset();
-      }
-
-      void
-      reset(void)
-      {
-        is_initialized = false;
+          hand_velocity_controller(&m_hand_velocity_reference, &state, m_params.h, m_params.U_max, &m_speed, &m_yaw_rate);
+          //dispatch(m_speed); // speed is handled by the PathController class by default -- no need to dispatch
+          dispatch(m_yaw_rate);
+          dispatch(m_z_ref);
+        }
       }
 
       void
       consume(const IMC::EstimatedState* msg)
-      {
+      { 
+        PathController::consume(msg);
+
         if (isActive())
         {
           get_hand_position(msg, m_params.h, &m_own_hand);
-          m_estate.lat = msg->lat;
-          m_estate.lon = msg->lon;
-          m_estate.psi = msg->psi;
-          m_estate.v = msg->v;
+          m_estate = *msg;
           is_initialized = true;
-          debug("Processing estate");
+          //debug("Processing estate");
         }
       }
 
@@ -198,17 +206,8 @@ namespace Consensus
 
           dispatch(m_speed);
           dispatch(m_yaw_rate);
+          dispatch(m_z_ref);
           debug("Dispatching references");
-        }
-      }
-
-      //! Main loop.
-      void
-      onMain(void)
-      {
-        while (!stopping())
-        {
-          waitForMessages(1.0);
         }
       }
     };    
