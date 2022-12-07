@@ -54,14 +54,8 @@ namespace Consensus
         float h;
         //! Formation-keeping proportional gain
         float c;
-        //! Constraint gain
-        float rho;
         //! Formation offset
         Vector2D offset;
-        //! Minimum safety distance
-        float d_min;
-        //! Maximum distance
-        float d_max;
         //! Maximum velocity reference
         float U_max;
         //! Maximum yaw rate reference
@@ -93,16 +87,10 @@ namespace Consensus
           .defaultValue("1");
         param("Formation Keeping Gain", m_params.c)
           .defaultValue("0.1");
-        param("Constraint Gain", m_params.rho)
-          .defaultValue("0.05");
         param("Formation Offset x", m_params.offset.x)
           .defaultValue("0");
         param("Formation Offset y", m_params.offset.y)
           .defaultValue("0");
-        param("Minimum Distance", m_params.d_min)
-          .defaultValue("5");
-        param("Maximum Distance", m_params.d_max)
-          .defaultValue("50");
         param("Maximum Speed Reference", m_params.U_max)
           .defaultValue("2");
         param("Maximum Yaw Rate", m_params.r_max)
@@ -205,7 +193,7 @@ namespace Consensus
           m_target_hand.x_dot = msg->sog * std::cos(msg->cog);
           m_target_hand.y_dot = msg->sog * std::sin(msg->cog);
 
-          edge_consensus(&m_own_hand, &m_target_hand, &m_params.offset, m_params.c, m_params.rho, m_params.d_min, m_params.d_max, &m_hand_velocity_reference);
+          edge_consensus(&m_own_hand, &m_target_hand, &m_params.offset, m_params.c, &m_hand_velocity_reference);
           hand_velocity_controller(&m_hand_velocity_reference, &m_estate, m_params.h, m_params.U_max, m_params.r_max, &m_speed, &m_yaw_rate);
 
           dispatch(m_speed);

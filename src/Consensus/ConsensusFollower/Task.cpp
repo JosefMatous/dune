@@ -98,7 +98,7 @@ namespace Consensus
         param("Formation Keeping Gain", m_params.c)
           .defaultValue("0.1");
         param("Constraint Gain", m_params.rho)
-          .defaultValue("0.05");
+          .defaultValue("0.5");
         param("Formation Offset x", m_params.offset.x)
           .defaultValue("0");
         param("Formation Offset y", m_params.offset.y)
