@@ -70,6 +70,10 @@ namespace Consensus
         std::string leader_name;
         //! Leader node ID
         uint16_t leader_id;
+        //! Dummy reference lookahead
+        float dummy_h;
+        //! Dummy reference frequency
+        int dummy_freq;
       } m_params;
 
       Vector2D m_hand_velocity_reference;
@@ -78,8 +82,12 @@ namespace Consensus
       IMC::DesiredZ m_z_ref;
 
       HandPosition m_own_hand;
-      IMC::EstimatedState m_estate;
+      //IMC::EstimatedState m_estate;
+      double m_lat, m_lon;
       HandPosition m_target_hand;
+
+      IMC::Reference m_dummy_reference;
+      int m_dummy_counter;
 
       bool is_initialized; // task has received EstimatedState
       bool m_active; // External activation
@@ -115,10 +123,17 @@ namespace Consensus
           .defaultValue("lauv-simulator-1");
         param("Maximum Yaw Rate", m_params.r_max)
           .defaultValue("1");
+        param("Dummy Reference -- Lookahead Distance", m_params.dummy_h)
+          .defaultValue("50");
+        param("Dummy Reference -- Decimation", m_params.dummy_freq)
+          .defaultValue("10");
 
         is_initialized = false;
         m_z_ref.value = 0;
         m_z_ref.z_units = IMC::Z_DEPTH;
+
+        m_dummy_reference.flags = IMC::Reference::FLAG_LOCATION | IMC::Reference::FLAG_Z;
+        m_dummy_counter = m_params.dummy_freq;
       }
 
       void
@@ -129,10 +144,12 @@ namespace Consensus
         m_params.leader_id = resolveSystemName(m_params.leader_name);
         debug("Leader %s resolved as %u", m_params.leader_name.c_str(), m_params.leader_id);
 
-        if (m_active != isActive())
+        m_dummy_counter = m_params.dummy_freq;
+
+        /*if (m_active != isActive())
         {
           m_active ? requestActivation() : requestDeactivation();
-        }
+        }*/
       }
 
       void
@@ -176,15 +193,20 @@ namespace Consensus
       {
         if (is_initialized)
         {
-          // Head straight to target
-          double x_rel = ts.end.x - m_own_hand.x;
-          double y_rel = ts.end.y - m_own_hand.y;
-          double xy_norm_inv = 1. / std::sqrt(x_rel*x_rel + y_rel*y_rel);
-          m_hand_velocity_reference.x = x_rel * xy_norm_inv;
-          m_hand_velocity_reference.y = y_rel * xy_norm_inv;
-
+          if (!m_active) // consensus inactive -- behave as a path controller
+          {
+            // Head straight to target
+            double x_rel = ts.end.x - m_own_hand.x;
+            double y_rel = ts.end.y - m_own_hand.y;
+            double xy_norm_inv = 1. / std::sqrt(x_rel*x_rel + y_rel*y_rel);
+            m_hand_velocity_reference.x = x_rel * xy_norm_inv;
+            m_hand_velocity_reference.y = y_rel * xy_norm_inv;
+          } else
+          {
+            edge_consensus(&m_own_hand, &m_target_hand, &m_params.offset, m_params.c, m_params.rho, m_params.d_min, m_params.d_max, &m_hand_velocity_reference);
+          }
           hand_velocity_controller(&m_hand_velocity_reference, &state, m_params.h, m_params.U_max, m_params.r_max, &m_speed, &m_yaw_rate);
-          //dispatch(m_speed); // speed is handled by the PathController class by default -- no need to dispatch
+          dispatch(m_speed); 
           dispatch(m_yaw_rate);
           dispatch(m_z_ref);
         }
@@ -195,33 +217,45 @@ namespace Consensus
       { 
         PathController::consume(msg);
 
-        if (isActive())
-        {
-          get_hand_position(msg, m_params.h, &m_own_hand);
-          m_estate = *msg;
-          is_initialized = true;
-          //debug("Processing estate");
-        }
+        get_hand_position(msg, m_params.h, &m_own_hand);
+        m_lat = msg->lat;
+        m_lon = msg->lon;
+        is_initialized = true;
       }
 
       void
       consume(const IMC::ConsensusPacket* msg)
       {
         debug("Received consensus packet from %u", msg->getSource());
-        if (isActive() && is_initialized && msg->getSource() == m_params.leader_id)
+        if (m_active && is_initialized && msg->getSource() == m_params.leader_id)
         {
           float z_dummy;
-          WGS84::displacement(m_estate.lat, m_estate.lon, 0., msg->lat, msg->lon, 0., &m_target_hand.x, &m_target_hand.y, &z_dummy);
+          WGS84::displacement(m_lat, m_lon, 0., msg->lat, msg->lon, 0., &m_target_hand.x, &m_target_hand.y, &z_dummy);
           m_target_hand.x_dot = msg->v_x;
           m_target_hand.y_dot = msg->v_y;
 
-          edge_consensus(&m_own_hand, &m_target_hand, &m_params.offset, m_params.c, m_params.rho, m_params.d_min, m_params.d_max, &m_hand_velocity_reference);
+          if (++m_dummy_counter >= m_params.dummy_freq)
+          {
+            m_dummy_counter = 0;
+
+            float hand_velocity_norm_inv = 1. / std::sqrt(m_hand_velocity_reference.x*m_hand_velocity_reference.x 
+                                                        + m_hand_velocity_reference.y*m_hand_velocity_reference.y);
+            m_dummy_reference.lat = m_lat;
+            m_dummy_reference.lon = m_lon;
+            WGS84::displace(m_own_hand.x + m_hand_velocity_reference.x*m_params.dummy_h*hand_velocity_norm_inv, 
+                            m_own_hand.y + m_hand_velocity_reference.y*m_params.dummy_h*hand_velocity_norm_inv,
+                            &m_dummy_reference.lat, &m_dummy_reference.lon);
+            dispatch(m_dummy_reference);
+          }
+
+
+          /*edge_consensus(&m_own_hand, &m_target_hand, &m_params.offset, m_params.c, m_params.rho, m_params.d_min, m_params.d_max, &m_hand_velocity_reference);
           hand_velocity_controller(&m_hand_velocity_reference, &m_estate, m_params.h, m_params.U_max, m_params.r_max, &m_speed, &m_yaw_rate);
 
           dispatch(m_speed);
           dispatch(m_yaw_rate);
           dispatch(m_z_ref);
-          debug("Dispatching references");
+          debug("Dispatching references");*/
         }
       }
     };    
