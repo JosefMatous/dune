@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 5563261871977bdb0b45e3d1e53b575b                            *
+// IMC XML MD5: 7cd8ebaaac0b3dd6956f7e8f4162291b                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_MACROS_HPP_INCLUDED_
@@ -504,6 +504,8 @@
 #define DUNE_IMC_TCPREQUEST 521
 //! TCPStatus identification number.
 #define DUNE_IMC_TCPSTATUS 522
+//! AssetReport identification number.
+#define DUNE_IMC_ASSETREPORT 525
 //! Abort identification number.
 #define DUNE_IMC_ABORT 550
 //! PlanSpecification identification number.
@@ -666,9 +668,31 @@
 #define DUNE_IMC_SADCREADINGS 907
 //! DmsDetection identification number.
 #define DUNE_IMC_DMSDETECTION 908
-//! TotalMagIntensity identification number.
-#define DUNE_IMC_TOTALMAGINTENSITY 2006
 //! HomePosition identification number.
 #define DUNE_IMC_HOMEPOSITION 909
+//! CurrentProfile identification number.
+#define DUNE_IMC_CURRENTPROFILE 1014
+//! CurrentProfileCell identification number.
+#define DUNE_IMC_CURRENTPROFILECELL 1015
+//! ADCPBeam identification number.
+#define DUNE_IMC_ADCPBEAM 1016
+//! GpioState identification number.
+#define DUNE_IMC_GPIOSTATE 2000
+//! GpioStateGet identification number.
+#define DUNE_IMC_GPIOSTATEGET 2001
+//! GpioStateSet identification number.
+#define DUNE_IMC_GPIOSTATESET 2002
+//! ColoredDissolvedOrganicMatter identification number.
+#define DUNE_IMC_COLOREDDISSOLVEDORGANICMATTER 2003
+//! FluorescentDissolvedOrganicMatter identification number.
+#define DUNE_IMC_FLUORESCENTDISSOLVEDORGANICMATTER 2004
+//! TotalMagIntensity identification number.
+#define DUNE_IMC_TOTALMAGINTENSITY 2006
+//! CommRestriction identification number.
+#define DUNE_IMC_COMMRESTRICTION 2010
+//! CurvedPathReference identification number.
+#define DUNE_IMC_CURVEDPATHREFERENCE 2021
+//! NSBMsg identification number.
+#define DUNE_IMC_NSBMSG 2022
 
 #endif

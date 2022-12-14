@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 5563261871977bdb0b45e3d1e53b575b                            *
+// IMC XML MD5: 7cd8ebaaac0b3dd6956f7e8f4162291b                            *
 //***************************************************************************
 
 MESSAGE(1, EntityState)
@@ -266,6 +266,7 @@ MESSAGE(519, VtolState)
 MESSAGE(520, ArmingState)
 MESSAGE(521, TCPRequest)
 MESSAGE(522, TCPStatus)
+MESSAGE(525, AssetReport)
 MESSAGE(550, Abort)
 MESSAGE(551, PlanSpecification)
 MESSAGE(552, PlanManeuver)
@@ -347,6 +348,17 @@ MESSAGE(905, Tachograph)
 MESSAGE(906, ApmStatus)
 MESSAGE(907, SadcReadings)
 MESSAGE(908, DmsDetection)
-MESSAGE(2006, TotalMagIntensity)
 MESSAGE(909, HomePosition)
+MESSAGE(1014, CurrentProfile)
+MESSAGE(1015, CurrentProfileCell)
+MESSAGE(1016, ADCPBeam)
+MESSAGE(2000, GpioState)
+MESSAGE(2001, GpioStateGet)
+MESSAGE(2002, GpioStateSet)
+MESSAGE(2003, ColoredDissolvedOrganicMatter)
+MESSAGE(2004, FluorescentDissolvedOrganicMatter)
+MESSAGE(2006, TotalMagIntensity)
+MESSAGE(2010, CommRestriction)
+MESSAGE(2021, CurvedPathReference)
+MESSAGE(2022, NSBMsg)
 #undef MESSAGE
