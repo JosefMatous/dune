@@ -55,7 +55,7 @@ namespace Consensus
       return 0.;
 
     float k1 = d_min_sq * z_d_norm_sq / (z_d_norm_sq - d_min_sq);
-    float k2 = 10. / (d_max_sq - z_d_norm_sq);
+    float k2 = 1. / (d_max_sq - z_d_norm_sq);
 
     return k1/(d_max_sq - z_norm_sq) - k2*d_min_sq*z_norm_sq/(z_norm_sq - d_min_sq);
   }
