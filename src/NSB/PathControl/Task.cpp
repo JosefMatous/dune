@@ -30,6 +30,8 @@
 // DUNE headers.
 #include <DUNE/DUNE.hpp>
 
+#include "../Utilities.hpp"
+
 namespace NSB
 {
   //! NSB path controller
@@ -58,14 +60,14 @@ namespace NSB
       } m_params;
 
       DiscretePID m_horizontal_pid;
-      DiscretePID m_vertical_pid;
+      float m_vertical_integrator;
+      float m_last_z;
 
       struct
       {
         float x, y, z;
       } m_desired_velocity;
       
-
       bool m_active; // External activation
 
       IMC::DesiredHeading m_yaw;
@@ -88,10 +90,10 @@ namespace NSB
         param("Horizontal PID Maximum Value", m_params.horizontal_max)
           .defaultValue("15");
         param("Vertical PID Gains", m_params.vertical_gains)
-          .defaultValue("10, 1, 0")
+          .defaultValue("1, 0.2, 0")
           .size(3);
         param("Vertical PID Integral Limit", m_params.vertical_limit)
-          .defaultValue("0.1");
+          .defaultValue("1");
         param("Maximum Pitch Reference", m_params.theta_max)
           .defaultValue("20");
         param("Vertical Control Feedforward Offset", m_params.vertical_ff_offset)
@@ -122,19 +124,11 @@ namespace NSB
           m_horizontal_pid.reset();
         }
         if (paramChanged(m_params.horizontal_max))
-        {
           m_horizontal_pid.setOutputLimits(-Angles::radians(m_params.horizontal_max), Angles::radians(m_params.horizontal_max));
-        }
         if (paramChanged(m_params.vertical_gains))
-        {
-          m_vertical_pid.setGains(m_params.vertical_gains);
-          m_vertical_pid.reset();
-        }
+          vertical_reset();
         if (paramChanged(m_params.vertical_limit))
-        {
-          m_vertical_pid.setIntegralLimits(m_params.vertical_limit);
-          m_vertical_pid.reset();
-        }
+          vertical_reset();
         if (paramChanged(m_params.theta_max))
           m_params.theta_max = Angles::radians(m_params.theta_max);
         if (paramChanged(m_params.vertical_ff_offset))
@@ -180,41 +174,42 @@ namespace NSB
       }
 
       inline void
+      vertical_reset(void)
+      {
+        m_vertical_integrator = 0.;
+        m_last_z = -100.;
+      }
+
+      inline void
       reset(void)
       {
         m_horizontal_pid.reset();
-        m_vertical_pid.reset();
+        vertical_reset();
       }
 
-      inline float
-      square(float x)
+      void
+      consume(const IMC::DesiredLinearState* msg)
       {
-        return x*x;
-      }
-
-        void
-        consume(const IMC::DesiredLinearState* msg)
+        if (m_active)
         {
-          if (isActive())
+          if (!(msg->flags & (IMC::DesiredLinearState::FL_VX | IMC::DesiredLinearState::FL_VY)))
           {
-            if (!(msg->flags & (IMC::DesiredLinearState::FL_VX | IMC::DesiredLinearState::FL_VY)))
-            {
-              war("DesiredLinearState velocities are invalid");
-              return;
-            }
+            war("DesiredLinearState velocities are invalid");
+            return;
+          }
 
-            m_desired_velocity.x = msg->vx;
-            m_desired_velocity.y = msg->vy;
-            if (msg->flags & IMC::DesiredLinearState::FL_VZ)
-            {
-              m_desired_velocity.z = msg->vz;
-            }
-            else
-            {
-              m_desired_velocity.z = 0.;
-            }
+          m_desired_velocity.x = msg->vx;
+          m_desired_velocity.y = msg->vy;
+          if (msg->flags & IMC::DesiredLinearState::FL_VZ)
+          {
+            m_desired_velocity.z = msg->vz;
+          }
+          else
+          {
+            m_desired_velocity.z = 0.;
           }
         }
+      }
 
       void
       step(const IMC::EstimatedState& state, const TrackingState& ts)
@@ -234,11 +229,19 @@ namespace NSB
         dispatch(m_yaw);
 
         // Vertical controller
-        float v_pid = m_vertical_pid.step(ts.delta, m_desired_velocity.z - state.vz, 0.); // PID output
+        float v_pid = m_params.vertical_gains[0] * (m_desired_velocity.z - state.vz) + m_params.vertical_gains[1] * m_vertical_integrator;
         float U = std::sqrt(square(m_desired_velocity.x) + square(m_desired_velocity.y) + square(m_desired_velocity.z));
         float theta_ref = m_params.vertical_ff_offset - std::asin(m_desired_velocity.z / U) - v_pid; // PID output is subtracted, as positive pitch angle results in negative vertical speed and vice versa
         m_pitch.value = trimValue(theta_ref, -m_params.theta_max, m_params.theta_max);
         dispatch(m_pitch);
+
+        /* Vertical integrator */
+        if (m_last_z > -1.)
+        {
+          m_vertical_integrator += m_desired_velocity.z * ts.delta - (state.depth - m_last_z);
+          m_vertical_integrator = trimValue(m_vertical_integrator, -m_params.vertical_limit, m_params.vertical_limit);
+          m_last_z = state.depth;
+        }
 
         // Speed controller
         if (m_active)
