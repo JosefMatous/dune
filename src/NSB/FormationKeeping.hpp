@@ -63,6 +63,19 @@ namespace NSB
     void
     step(GeometricPath::PathReference path_ref, Vector3D sigma, double path_parameter_derivative, Vector3D& output)
     {
+      Vector3D sigma_d, sigma_d_dot;
+      get_reference(path_ref, path_parameter_derivative, sigma_d, sigma_d_dot);
+
+      // Calculate the formation-keeping velocities
+      output.x = k_form * (sigma_d.x - sigma.x) + sigma_d_dot.x;
+      output.y = k_form * (sigma_d.y - sigma.y) + sigma_d_dot.y;
+      output.z = k_form * (sigma_d.z - sigma.z) + sigma_d_dot.z;
+    }
+
+  protected:
+    inline void
+    get_reference(GeometricPath::PathReference path_ref, double path_parameter_derivative, Vector3D& sigma_d, Vector3D& sigma_d_dot)
+    {
       // Calculate the path rotation matrix and its derivative
       double c_theta = std::cos(path_ref.theta);
       double s_theta = std::sin(path_ref.theta);
@@ -78,22 +91,47 @@ namespace NSB
                             {                            -kappa*c_theta,            0,                           -kappa*s_theta}};
 
       // Calculate the desired values of sigma
-      Vector3D sigma_d;
       sigma_d.x = R[0][0] * p_form.x + R[0][1] * p_form.y + R[0][2] * p_form.z;
       sigma_d.y = R[1][0] * p_form.x + R[1][1] * p_form.y + R[1][2] * p_form.z;
       sigma_d.z = R[2][0] * p_form.x + R[2][1] * p_form.y + R[2][2] * p_form.z;
-
-      Vector3D sigma_d_dot;   
+ 
       sigma_d_dot.x = R_dot[0][0] * p_form.x + R_dot[0][1] * p_form.y + R_dot[0][2] * p_form.z;
       sigma_d_dot.y = R_dot[1][0] * p_form.x + R_dot[1][1] * p_form.y + R_dot[1][2] * p_form.z;
       sigma_d_dot.z = R_dot[2][0] * p_form.x + R_dot[2][1] * p_form.y + R_dot[2][2] * p_form.z;
+    }
+  }; 
+
+  class FormationKeepingSaturated: public FormationKeeping
+  {
+  public:
+    double v_max;
+
+    /* Default constructor */
+    FormationKeepingSaturated(void):
+      FormationKeeping::FormationKeeping()
+    {
+      v_max = 1.;
+    }
+
+    FormationKeepingSaturated(double x, double y, double z, double k, double v):
+      FormationKeeping::FormationKeeping(x, y, z, k)
+    {
+      v_max = v;
+    }
+
+    void
+    step(GeometricPath::PathReference path_ref, Vector3D sigma, double path_parameter_derivative, Vector3D& output)
+    {
+      Vector3D sigma_d, sigma_d_dot;
+      get_reference(path_ref, path_parameter_derivative, sigma_d, sigma_d_dot);
 
       // Calculate the formation-keeping velocities
-      output.x = k_form * (sigma_d.x - sigma.x) + sigma_d_dot.x;
-      output.y = k_form * (sigma_d.y - sigma.y) + sigma_d_dot.y;
-      output.z = k_form * (sigma_d.z - sigma.z) + sigma_d_dot.z;
+      output.x = v_max * std::tanh(k_form * (sigma_d.x - sigma.x)) + sigma_d_dot.x;
+      output.y = v_max * std::tanh(k_form * (sigma_d.y - sigma.y)) + sigma_d_dot.y;
+      output.z = v_max * std::tanh(k_form * (sigma_d.z - sigma.z)) + sigma_d_dot.z;
     }
-  };  
+  };
+   
 }
 
 #endif

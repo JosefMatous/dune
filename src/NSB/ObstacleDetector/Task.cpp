@@ -50,12 +50,19 @@ namespace NSB
         DUNE::Tasks::Task(name, ctx)
       {
         bind<IMC::Target>(this);
+        bind<IMC::NSBMsg>(this);
       }
 
       void
       consume(const IMC::Target* msg)
       {
         debug("Received target from %s", resolveSystemId(msg->getSource()));
+      }
+
+      void
+      consume(const IMC::NSBMsg* msg)
+      {
+        debug("Received NSB message from %s", resolveSystemId(msg->getSource()));
       }
 
       //! Main loop.

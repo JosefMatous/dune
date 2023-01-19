@@ -48,7 +48,7 @@ namespace NSB
         };
 
         inline virtual void
-        getPathReference(double path_parameter, PathReference& ref);
+        getPathReference(double path_parameter, PathReference& ref) = 0;
 
         inline static void
         getPathFollowingError(PathReference ref, double x_vehicle, double y_vehicle, double z_vehicle, Vector3D& path_err)
