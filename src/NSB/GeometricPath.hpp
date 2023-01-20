@@ -142,22 +142,37 @@ namespace NSB
           // Calculate derivatives
           double x0_dot = -direction*m_a*s_arg;
           double y0_dot =  direction*m_b*c_arg;
+          //double x0_ddot = -x0;
+          //double y0_ddot = -y0;
+
           // Gradient and pitch angle
-          if (z_ned > 0)
+          double denominator;
+          if ((z_ned > 0) && (m_c > 0))
           {
             ref.z = z_ned;
             double z0_dot = m_z_freq*m_c*std::cos(z_arg);
             ref.gradient = std::sqrt(square(x0_dot) + square(y0_dot) + square(z0_dot));
             ref.theta = -std::asin(z0_dot / ref.gradient);
+
+            // Vertical curvature == partial of ref.theta w.r.t. s
+            double z0_ddot = -m_z_freq*m_z_freq*m_c*std::sin(z_arg);
+            double gradient_diff = (-x0*x0_dot - y0*y0_dot + z0_ddot*z0_dot) / ref.gradient;
+            denominator = 1. / std::sqrt(square(ref.gradient) - square(z0_dot));
+            ref.kappa = -z0_ddot*denominator + gradient_diff*denominator/ref.gradient;
           }
           else
           { // saturate to zero if the reference depth is negative
             ref.z = 0.;
             ref.gradient = std::sqrt(square(x0_dot) + square(y0_dot));
             ref.theta = 0.;
+            ref.kappa = 0.;
           }
           // Path yaw angle
           ref.psi = m_psi + std::atan2(y0_dot, x0_dot);
+
+          // Horizontal curvature == partial of ref.psi w.r.t. s
+          denominator = 1. / (square(x0_dot) + square(y0_dot));
+          ref.iota = (x0*y0_dot - y0*x0_dot) * denominator;
         }
     };
 }

@@ -308,12 +308,12 @@ namespace NSB
           //debug("Path parameter %.3f", m_nsb_state.path_param);
 
           Vector3D path_err;
-          GeometricPath::getPathFollowingError(path_ref, msg, path_err);
+          GeometricPath::getPathFollowingError(path_ref, m_nsb_state.x, m_nsb_state.y, m_nsb_state.z, path_err);
           LineOfSight::LineOfSightOutput los_out;
           m_los.step(path_ref, path_err, los_out);
 
           //debug("Path error: x = %.2f, y = %.2f", path_err.x, path_err.y);
-          //debug("LOS vector: x = %.2f, y = %.2f", los_out.velocity.x, los_out.velocity.y);
+          //debug("LOS vector: x = %.2f, y = %.2f, z = %.2f", los_out.velocity.x, los_out.velocity.y, los_out.velocity.z);
 
           Vector3D sigma;
           sigma.x = msg->x - m_nsb_state.x;

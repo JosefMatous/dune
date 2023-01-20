@@ -93,21 +93,22 @@ namespace NSB
           // definition: theta_los = asin(path_error.z / D)
           //               psi_los = -atan(path_error.y / lookahead)
           double D = std::sqrt(square(lookahead) + square(path_error.y) + square(path_error.z));
-          double theta_D = std::asin(path_error.z / D);
-          double psi_D = - std::atan(path_error.y / lookahead);
           
-          double theta_los = path_ref.theta + theta_D;
-          double psi_los = path_ref.psi + psi_D;
+          // Calculate the path rotation matrix
+          double c_theta = std::cos(path_ref.theta);
+          double s_theta = std::sin(path_ref.theta);
+          double c_psi = std::cos(path_ref.psi);
+          double s_psi = std::sin(path_ref.psi);
+          double R[3][3] = {{c_psi*c_theta, -s_psi, c_psi*s_theta},
+                            {c_theta*s_psi,  c_psi, s_psi*s_theta},
+                            {     -s_theta,      0,       c_theta}};
 
-          double c_theta_los = std::cos(theta_los);
-          double s_theta_los = std::sin(theta_los);
-          double c_psi_los = std::cos(psi_los);
-          double s_psi_los = std::sin(psi_los);
+          double U_LOS = m_speed / D;
 
           // LOS velocities
-          out.velocity.x = m_speed * c_theta_los * c_psi_los;
-          out.velocity.y = m_speed * c_theta_los * s_psi_los;
-          out.velocity.z = m_speed * (-s_theta_los);
+          out.velocity.x = U_LOS * (R[0][0]*lookahead - R[0][1]*path_error.y - R[0][2]*path_error.z);
+          out.velocity.y = U_LOS * (R[1][0]*lookahead - R[1][1]*path_error.y - R[1][2]*path_error.z);
+          out.velocity.z = U_LOS * (R[2][0]*lookahead - R[2][1]*path_error.y - R[2][2]*path_error.z);
 
           // Path parameter update law
           out.path_parameter_derivative = m_speed * (lookahead/D + m_parameter_gain*path_error.x/std::sqrt(square(path_error.x) + 1)) / path_ref.gradient;
