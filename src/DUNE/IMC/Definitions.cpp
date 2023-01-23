@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 7cd8ebaaac0b3dd6956f7e8f4162291b                            *
+// IMC XML MD5: a9b25b801ed53322c5c666ae717ee492                            *
 //***************************************************************************
 
 // ISO C++ 98 headers.
@@ -28228,6 +28228,86 @@ namespace DUNE
 
     void
     NSBMsg::fieldsToJSON(std::ostream& os__, unsigned nindent__) const
+    {
+      IMC::toJSON(os__, "path_param", path_param, nindent__);
+      IMC::toJSON(os__, "x", x, nindent__);
+      IMC::toJSON(os__, "y", y, nindent__);
+      IMC::toJSON(os__, "z", z, nindent__);
+      IMC::toJSON(os__, "r_f", r_f, nindent__);
+    }
+
+    NSBState::NSBState(void)
+    {
+      m_header.mgid = 2023;
+      clear();
+    }
+
+    void
+    NSBState::clear(void)
+    {
+      path_param = 0;
+      x = 0;
+      y = 0;
+      z = 0;
+      r_f = 0;
+    }
+
+    bool
+    NSBState::fieldsEqual(const Message& msg__) const
+    {
+      const IMC::NSBState& other__ = static_cast<const NSBState&>(msg__);
+      if (path_param != other__.path_param) return false;
+      if (x != other__.x) return false;
+      if (y != other__.y) return false;
+      if (z != other__.z) return false;
+      if (r_f != other__.r_f) return false;
+      return true;
+    }
+
+    int
+    NSBState::validate(void) const
+    {
+      return true;
+    }
+
+    uint8_t*
+    NSBState::serializeFields(uint8_t* bfr__) const
+    {
+      uint8_t* ptr__ = bfr__;
+      ptr__ += IMC::serialize(path_param, ptr__);
+      ptr__ += IMC::serialize(x, ptr__);
+      ptr__ += IMC::serialize(y, ptr__);
+      ptr__ += IMC::serialize(z, ptr__);
+      ptr__ += IMC::serialize(r_f, ptr__);
+      return ptr__;
+    }
+
+    uint16_t
+    NSBState::deserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      const uint8_t* start__ = bfr__;
+      bfr__ += IMC::deserialize(path_param, bfr__, size__);
+      bfr__ += IMC::deserialize(x, bfr__, size__);
+      bfr__ += IMC::deserialize(y, bfr__, size__);
+      bfr__ += IMC::deserialize(z, bfr__, size__);
+      bfr__ += IMC::deserialize(r_f, bfr__, size__);
+      return bfr__ - start__;
+    }
+
+    uint16_t
+    NSBState::reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      const uint8_t* start__ = bfr__;
+      bfr__ += IMC::reverseDeserialize(path_param, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(x, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(y, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(z, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(r_f, bfr__, size__);
+      return bfr__ - start__;
+    }
+
+    void
+    NSBState::fieldsToJSON(std::ostream& os__, unsigned nindent__) const
     {
       IMC::toJSON(os__, "path_param", path_param, nindent__);
       IMC::toJSON(os__, "x", x, nindent__);

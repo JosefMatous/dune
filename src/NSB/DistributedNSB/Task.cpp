@@ -50,18 +50,27 @@ namespace NSB
     {
       Ellipse m_path;
       LineOfSight m_los;
-      //FormationKeepingSaturated m_form;
-      FormationKeeping m_form;
+      FormationKeepingSaturated m_form;
       Delta m_last_step;
       std::vector<double> m_form_shape;
 
-      NSBState m_nsb_state;
+      struct
+      {
+        float k_position, k_param;
+        float r_ss, k_r;
+        float T_min, T_max;
+        float a_position, a_param;
+        int trans_limit;
+      } m_consensus_param;
 
-      float k_position, k_param;
-      float m_r_ss, m_k_r;
+      // Current communications period
+      float m_comm_period;
+      int m_transmission_couner;
+      double m_last_transmission;
 
       IMC::DesiredLinearState m_linstate;
       IMC::NSBMsg m_nsb_msg;
+      IMC::NSBState m_nsb_state;
       IMC::CurvedPathReference m_path_ref;
 
       // External activation
@@ -77,8 +86,7 @@ namespace NSB
         DUNE::Tasks::Task(name, ctx),
         m_path(0, 0, 0., 50., 30., 0., 0, 0., false, M_PI_2, 0.),
         m_los(15., false, 1.3, 0.5),
-        //m_form(0., 0., 0., 0.25, 0.5)
-        m_form(0., 0., 0., 0.25)
+        m_form(0., 0., 0., 0.25, 0.5)
       {
         bind<IMC::EstimatedState>(this);
         bind<IMC::NSBMsg>(this);
@@ -155,23 +163,43 @@ namespace NSB
           .defaultValue("0.25")
           .minimumValue("0.")
           .description("Formation keeping task gain");
-        /*param("Formation Keeping -- Maximum Velocity", m_form.v_max)
+        param("Formation Keeping -- Maximum Velocity", m_form.v_max)
           .defaultValue("0.5")
           .minimumValue("0.")
-          .description("Formation keeping velocity limit");*/
+          .description("Formation keeping velocity limit");
 
-        param("Consensus -- Position Gain", k_position)
+        param("Consensus -- Position Gain", m_consensus_param.k_position)
           .defaultValue("0.3")
           .minimumValue("0.")
           .maximumValue("1.");
-        param("Consensus -- Parameter Gain", k_param)
+        param("Consensus -- Parameter Gain", m_consensus_param.k_param)
           .defaultValue("0.3")
           .minimumValue("0.")
           .maximumValue("1.");
+        param("Consensus -- Maximum Communication Period", m_consensus_param.T_max)
+          .defaultValue("80")
+          .minimumValue("5")
+          .maximumValue("1000");
+        param("Consensus -- Minimum Communication Period", m_consensus_param.T_min)
+          .defaultValue("1")
+          .minimumValue("0.05")
+          .maximumValue("10");
+        param("Consensus -- Position Time Constant", m_consensus_param.a_position)
+          .defaultValue("1")
+          .minimumValue("0.")
+          .maximumValue("10.");
+        param("Consensus -- Parameter Time Constant", m_consensus_param.a_param)
+          .defaultValue("50")
+          .minimumValue("0.")
+          .maximumValue("1000.");
+        param("Consensus -- Transmission Limit", m_consensus_param.trans_limit)
+          .defaultValue("2")
+          .minimumValue("1")
+          .maximumValue("10");
 
-        param("Steady-state Formation Radius", m_r_ss)
+        param("Steady-state Formation Radius", m_consensus_param.r_ss)
           .defaultValue("10");
-        param("Formation Radius Time Constant", m_k_r)
+        param("Formation Radius Time Constant", m_consensus_param.k_r)
           .defaultValue("0.05");
 
         param("Active", m_active)
@@ -222,6 +250,11 @@ namespace NSB
           m_form.p_form.y = m_form_shape[1];
           m_form.p_form.z = m_form_shape[2];
         }
+        if (m_consensus_param.T_min > m_consensus_param.T_max)
+        {
+          war("Minimum communications period is greater than maximum communications period");
+          m_consensus_param.T_min = m_consensus_param.T_max;
+        }
       }
 
       void
@@ -237,6 +270,8 @@ namespace NSB
       {
         m_T_start = -1.;
         is_initialized = false;
+        m_comm_period = m_consensus_param.T_min;
+        m_transmission_couner = 0;
       }
 
       void
@@ -246,10 +281,20 @@ namespace NSB
         {
           debug("Received consensus message from %s", resolveSystemId(msg->getSource()));
 
-          m_nsb_state.path_param = k_param * msg->path_param + (1. - k_param) * m_nsb_state.path_param;
-          m_nsb_state.x = k_position * msg->x + (1. - k_position) * m_nsb_state.x;
-          m_nsb_state.y = k_position * msg->y + (1. - k_position) * m_nsb_state.y;
-          m_nsb_state.z = k_position * msg->z + (1. - k_position) * m_nsb_state.z;
+          /* Update communications period */
+          float consensus_error = std::sqrt(square(m_consensus_param.a_position*(msg->x - m_nsb_state.x))
+                                        + square(m_consensus_param.a_position*(msg->y - m_nsb_state.y))
+                                        + square(m_consensus_param.a_position*(msg->z - m_nsb_state.z))
+                                        + square(m_consensus_param.a_param*(msg->path_param - m_nsb_state.path_param)));
+          m_comm_period = m_consensus_param.T_min + (m_consensus_param.T_max - m_consensus_param.T_min) * std::exp(-consensus_error);
+          debug("Communications period set to %.1f seconds", m_comm_period);
+
+          m_transmission_couner = 0;
+
+          m_nsb_state.path_param = m_consensus_param.k_param * msg->path_param + (1. - m_consensus_param.k_param) * m_nsb_state.path_param;
+          m_nsb_state.x = m_consensus_param.k_position * msg->x + (1. - m_consensus_param.k_position) * m_nsb_state.x;
+          m_nsb_state.y = m_consensus_param.k_position * msg->y + (1. - m_consensus_param.k_position) * m_nsb_state.y;
+          m_nsb_state.z = m_consensus_param.k_position * msg->z + (1. - m_consensus_param.k_position) * m_nsb_state.z;
           if (msg->r_f > m_nsb_state.r_f)
             m_nsb_state.r_f = msg->r_f;
         }
@@ -261,6 +306,7 @@ namespace NSB
         if (isActive())
         {
           double delta_t;
+          double time_now = Clock::get();
           if (!is_initialized)
           {
             // initialized the NSB state with current position
@@ -271,14 +317,19 @@ namespace NSB
             m_nsb_state.r_f = 0.;
 
             m_last_step.reset();
-            m_T_start = Clock::get();
+            m_T_start = time_now;
             delta_t = 0.05;
+            m_last_transmission = time_now;
 
             is_initialized = true;
           }
           else
           {
             delta_t = m_last_step.getDelta();
+            // update estimate of formation radius
+            float r_f = std::sqrt(square(msg->x - m_nsb_state.x) + square(msg->y - m_nsb_state.y));
+            if (r_f > m_nsb_state.r_f)
+              m_nsb_state.r_f = r_f;
           }
 
           GeometricPath::PathReference path_ref;
@@ -286,13 +337,21 @@ namespace NSB
 
           //debug("Vehicle at x = %.2f, y = %.2f", msg->x, msg->y);
 
+          // Log NSB state
+          dispatch(m_nsb_state);
+
           // Dispatch NSB message
-          m_nsb_msg.path_param = m_nsb_state.path_param;
-          m_nsb_msg.x = m_nsb_state.x;
-          m_nsb_msg.y = m_nsb_state.y;
-          m_nsb_msg.z = m_nsb_state.z;
-          m_nsb_msg.r_f = m_nsb_state.r_f;
-          dispatch(m_nsb_msg);
+          if ((time_now - m_last_transmission >= m_comm_period) && (m_transmission_couner < m_consensus_param.trans_limit))
+          {
+            m_nsb_msg.path_param = m_nsb_state.path_param;
+            m_nsb_msg.x = m_nsb_state.x;
+            m_nsb_msg.y = m_nsb_state.y;
+            m_nsb_msg.z = m_nsb_state.z;
+            m_nsb_msg.r_f = m_nsb_state.r_f;
+            dispatch(m_nsb_msg);
+            m_last_transmission = time_now;
+            m_transmission_couner++;
+          }
 
           // Dispatch path reference
           m_path_ref.param = m_nsb_state.path_param;
@@ -330,7 +389,7 @@ namespace NSB
           m_linstate.vz = los_out.velocity.z + form_velocity.z;
           dispatch(m_linstate);
 
-          nsb_simulator_step(los_out, m_r_ss, m_k_r, delta_t, m_nsb_state);
+          nsb_simulator_step(los_out, m_consensus_param.r_ss, m_consensus_param.k_r, delta_t, m_nsb_state);
 
           if (m_T_stop > 0.) // check for time-based termination
           {

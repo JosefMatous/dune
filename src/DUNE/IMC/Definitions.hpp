@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 7cd8ebaaac0b3dd6956f7e8f4162291b                            *
+// IMC XML MD5: a9b25b801ed53322c5c666ae717ee492                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_DEFINITIONS_HPP_INCLUDED_
@@ -26691,6 +26691,75 @@ namespace DUNE
       getName(void) const
       {
         return "NSBMsg";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 20;
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! NSB State.
+    class NSBState: public Message
+    {
+    public:
+      //! Path Parameter.
+      fp32_t path_param;
+      //! Barycenter x.
+      fp32_t x;
+      //! Barycenter y.
+      fp32_t y;
+      //! Barycenter z.
+      fp32_t z;
+      //! Formation Radius.
+      fp32_t r_f;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 2023;
+      }
+
+      NSBState(void);
+
+      NSBState*
+      clone(void) const
+      {
+        return new NSBState(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return NSBState::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "NSBState";
       }
 
       unsigned
