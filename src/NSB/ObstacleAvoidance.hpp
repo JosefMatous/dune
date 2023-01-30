@@ -107,7 +107,10 @@ namespace NSB
           }
 
           if (m_last_direction == 0.)
-            m_last_direction = sign(cross(relative_position, relative_velocity));
+          {
+            //m_last_direction = sign(cross(relative_position, relative_velocity));
+            m_last_direction = sign(obs.vx*relative_position.y - obs.vy*relative_position.x);
+          }
 
           double desired_course = std::atan2(relative_position.y, relative_position.x) + m_last_direction*cone_angle;
           out.velocity.x = speed*std::cos(desired_course) + obs.vx;
