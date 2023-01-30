@@ -11,6 +11,8 @@
 #include "../GeometricPath.hpp"
 #include "../LineOfSight.hpp"
 #include "../Utilities.hpp"
+#include "../ObstacleAvoidance.hpp"
+#include "../ObstacleEstimator.hpp"
 #include "NSBSimulator.hpp"
 
 namespace NSB
@@ -63,61 +65,83 @@ namespace NSB
       unsigned int buffer_size, decimation;
     };
 
+    //! Returns the index of the first element in `log` whose timestamp is larger than the timstamp of `x`.
+    //! Returns the size of the log if no such value exists.
+    unsigned int
+    get_closest_index(CircularBuffer<NSBStateTimestamp>& log, NSBStateTimestamp& x)
+    {
+      unsigned int i = log.getSize();
+      while (i > 1)
+      {
+        if (log(i-1).timestamp < x.timestamp)
+          return i;
+        --i;
+      }
+      return 0;
+    }
+
+    inline void
+    consensus_algorithm(ConsensusParameters& params, NSBStateTimestamp& own_state, NSBStateTimestamp& received)
+    {
+      /* Update communications period */
+      float consensus_error = std::sqrt(square(params.a_position*(received.nsb_state.x - own_state.nsb_state.x))
+                                    + square(params.a_position*(received.nsb_state.y - own_state.nsb_state.y))
+                                    + square(params.a_position*(received.nsb_state.z - own_state.nsb_state.z))
+                                    + square(params.a_param*(received.nsb_state.path_param - own_state.nsb_state.path_param)));
+      params.comm_period = params.T_min + (params.T_max - params.T_min) * std::exp(-consensus_error);
+      /* Consensus algorithm */
+      own_state.nsb_state.path_param = params.k_param * received.nsb_state.path_param + (1. - params.k_param) * own_state.nsb_state.path_param;
+      own_state.nsb_state.x = params.k_position * received.nsb_state.x + (1. - params.k_position) * own_state.nsb_state.x;
+      own_state.nsb_state.y = params.k_position * received.nsb_state.y + (1. - params.k_position) * own_state.nsb_state.y;
+      own_state.nsb_state.z = params.k_position * received.nsb_state.z + (1. - params.k_position) * own_state.nsb_state.z;
+      if (received.nsb_state.r_f > own_state.nsb_state.r_f)
+        own_state.nsb_state.r_f = received.nsb_state.r_f;
+    }
+
     inline void
     nsb_consensus_update(NSBStateTimestamp& s_recv, NSBStateTimestamp& s_current, CircularBuffer<NSBStateTimestamp>& s_log, 
                           LineOfSight& los, GeometricPath& path, ConsensusParameters& params)
     {
-      // Sanity check
-      if (s_recv.timestamp > s_current.timestamp)
-        throw std::runtime_error("Timestamp of the recieved state is larger than the timestamp of the current state.");
-
-      // Find the next closest NSB state in the log
-      unsigned int i = s_log.getSize();
-      while (i > 0)
-      {
-        if (s_log(i-1).timestamp < s_recv.timestamp)
-          break;
-        --i;
-      }
+      // Check it there is a need to forward-estimate
+      bool do_simulations = (s_recv.timestamp < s_current.timestamp);
+      unsigned int i;
       NSBStateTimestamp s_closest;
-      if (i < s_log.getSize())        
-        s_closest = s_log(i);
-      else
-        s_closest = s_current;
 
-      // Update the received NSB message
-      int N_steps = (int) std::ceil((s_closest.timestamp - s_recv.timestamp) / params.delta_t);
-      double delta_t = (s_closest.timestamp - s_recv.timestamp) / N_steps;
-      nsb_simulator_run(los, path, params.r_ss, params.k_r, N_steps, delta_t, s_recv.nsb_state);
-      s_recv.timestamp = s_closest.timestamp;
+      if (do_simulations)
+      {
+        // Find the next closest NSB state in the log
+        i = get_closest_index(s_log, s_recv);
+        if (i < s_log.getSize())        
+          s_closest = s_log(i);
+        else
+          s_closest = s_current;
+
+        // Update the received NSB message
+        int N_steps = (int) std::ceil((s_closest.timestamp - s_recv.timestamp) / params.delta_t);
+        double delta_t = (s_closest.timestamp - s_recv.timestamp) / N_steps;
+        nsb_simulator_run(los, path, params.r_ss, params.k_r, N_steps, delta_t, s_recv.nsb_state);
+        s_recv.timestamp = s_closest.timestamp;
+      }
+      else
+      {
+        s_closest = s_current;
+      }
 
       // Perform consensus
-      /* Update communications period */
-      float consensus_error = std::sqrt(square(params.a_position*(s_recv.nsb_state.x - s_closest.nsb_state.x))
-                                    + square(params.a_position*(s_recv.nsb_state.y - s_closest.nsb_state.y))
-                                    + square(params.a_position*(s_recv.nsb_state.z - s_closest.nsb_state.z))
-                                    + square(params.a_param*(s_recv.nsb_state.path_param - s_closest.nsb_state.path_param)));
-      params.comm_period = params.T_min + (params.T_max - params.T_min) * std::exp(-consensus_error);
-      /* Consensus algorithm */
-      s_closest.nsb_state.path_param = params.k_param * s_recv.nsb_state.path_param + (1. - params.k_param) * s_closest.nsb_state.path_param;
-      s_closest.nsb_state.x = params.k_position * s_recv.nsb_state.x + (1. - params.k_position) * s_closest.nsb_state.x;
-      s_closest.nsb_state.y = params.k_position * s_recv.nsb_state.y + (1. - params.k_position) * s_closest.nsb_state.y;
-      s_closest.nsb_state.z = params.k_position * s_recv.nsb_state.z + (1. - params.k_position) * s_closest.nsb_state.z;
-      if (s_recv.nsb_state.r_f > s_closest.nsb_state.r_f)
-        s_closest.nsb_state.r_f = s_recv.nsb_state.r_f;
+      consensus_algorithm(params, s_closest, s_recv);
       /* Write the results back to the log */
-      if (i < s_log.getSize())
+      if (do_simulations && i < s_log.getSize())
         s_log(i).nsb_state = s_closest.nsb_state;
       else
         s_current.nsb_state = s_closest.nsb_state;
 
       // Update the log
-      if (i < s_log.getSize())
+      if (do_simulations && i < s_log.getSize())
       {
         while (++i < s_log.getSize())
         {
-          N_steps = (int) std::ceil((s_log(i).timestamp - s_log(i-1).timestamp) / params.delta_t);
-          delta_t = (s_log(i).timestamp - s_log(i-1).timestamp) / N_steps;
+          int N_steps = (int) std::ceil((s_log(i).timestamp - s_log(i-1).timestamp) / params.delta_t);
+          double delta_t = (s_log(i).timestamp - s_log(i-1).timestamp) / N_steps;
           s_log(i).nsb_state = s_log(i-1).nsb_state;
           nsb_simulator_run(los, path, params.r_ss, params.k_r, N_steps, delta_t, s_log(i).nsb_state);
         }
@@ -125,9 +149,68 @@ namespace NSB
         s_current.nsb_state = s_log(i).nsb_state;
         if (s_current.timestamp > s_log(i).timestamp)
         {
-          N_steps = (int) std::ceil((s_current.timestamp - s_log(i).timestamp) / params.delta_t);
-          delta_t = (s_current.timestamp - s_log(i).timestamp) / N_steps;
+          int N_steps = (int) std::ceil((s_current.timestamp - s_log(i).timestamp) / params.delta_t);
+          double delta_t = (s_current.timestamp - s_log(i).timestamp) / N_steps;
           nsb_simulator_run(los, path, params.r_ss, params.k_r, N_steps, delta_t, s_current.nsb_state);
+        }
+      }
+    }
+
+    inline void
+    nsb_consensus_update(NSBStateTimestamp& s_recv, NSBStateTimestamp& s_current, CircularBuffer<NSBStateTimestamp>& s_log, 
+                          ObstacleAvoidance& oa, ObstacleEstimator& estimator,  
+                          LineOfSight& los, GeometricPath& path, ConsensusParameters& params)
+    {
+      // Check it there is a need to forward-estimate
+      bool do_simulations = (s_recv.timestamp < s_current.timestamp);
+      unsigned int i;
+      NSBStateTimestamp s_closest;
+
+      if (do_simulations)
+      {
+        // Find the next closest NSB state in the log
+        i = get_closest_index(s_log, s_recv);
+        if (i < s_log.getSize())        
+          s_closest = s_log(i);
+        else
+          s_closest = s_current;
+
+        // Update the received NSB message
+        int N_steps = (int) std::ceil((s_closest.timestamp - s_recv.timestamp) / params.delta_t);
+        double delta_t = (s_closest.timestamp - s_recv.timestamp) / N_steps;
+        nsb_simulator_run(los, path, oa, estimator, s_recv.timestamp, params.r_ss, params.k_r, N_steps, delta_t, s_recv.nsb_state);
+        s_recv.timestamp = s_closest.timestamp;
+      }
+      else
+      {
+        s_closest = s_current;
+      }
+
+      // Perform consensus
+      consensus_algorithm(params, s_closest, s_recv);
+      /* Write the results back to the log */
+      if (do_simulations && i < s_log.getSize())
+        s_log(i).nsb_state = s_closest.nsb_state;
+      else
+        s_current.nsb_state = s_closest.nsb_state;
+
+      // Update the log
+      if (do_simulations && i < s_log.getSize())
+      {
+        while (++i < s_log.getSize())
+        {
+          int N_steps = (int) std::ceil((s_log(i).timestamp - s_log(i-1).timestamp) / params.delta_t);
+          double delta_t = (s_log(i).timestamp - s_log(i-1).timestamp) / N_steps;
+          s_log(i).nsb_state = s_log(i-1).nsb_state;
+          nsb_simulator_run(los, path, oa, estimator, s_log(i-1).timestamp, params.r_ss, params.k_r, N_steps, delta_t, s_log(i).nsb_state);
+        }
+        --i;
+        s_current.nsb_state = s_log(i).nsb_state;
+        if (s_current.timestamp > s_log(i).timestamp)
+        {
+          int N_steps = (int) std::ceil((s_current.timestamp - s_log(i).timestamp) / params.delta_t);
+          double delta_t = (s_current.timestamp - s_log(i).timestamp) / N_steps;
+          nsb_simulator_run(los, path, oa, estimator, s_log(i).timestamp, params.r_ss, params.k_r, N_steps, delta_t, s_current.nsb_state);
         }
       }
     }

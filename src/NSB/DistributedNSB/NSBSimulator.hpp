@@ -11,6 +11,8 @@
 #include "../GeometricPath.hpp"
 #include "../LineOfSight.hpp"
 #include "../Utilities.hpp"
+#include "../ObstacleAvoidance.hpp"
+#include "../ObstacleEstimator.hpp"
 
 namespace NSB
 {
@@ -105,6 +107,27 @@ namespace NSB
         path.getPathFollowingError(path_ref, nsb_state.x, nsb_state.y, nsb_state.z, path_err);
         los.step(path_ref, path_err, out);
         nsb_simulator_step(out, r_f_steady_state, k_r_f, delta_t, nsb_state);
+      }      
+    }
+
+    inline void
+    nsb_simulator_run(LineOfSight& los, GeometricPath& path, ObstacleAvoidance& oa, ObstacleEstimator& estimator, double timestamp_init,
+                    float r_f_steady_state, float k_r_f, int N_steps, double delta_t, NSBState& nsb_state)
+    {
+      LineOfSight::LineOfSightOutput out;
+      GeometricPath::PathReference path_ref;
+      Vector3D path_err;
+      ObstacleState obstacle;
+      double timestamp = timestamp_init;
+      for (int i = 0; i < N_steps; i++)
+      {
+        path.getPathReference(nsb_state.path_param, path_ref);
+        path.getPathFollowingError(path_ref, nsb_state.x, nsb_state.y, nsb_state.z, path_err);
+        estimator.get_obstacle_state(timestamp, obstacle);
+        los.step(path_ref, path_err, out);
+        oa.step(nsb_state.x, nsb_state.y, obstacle, nsb_state.r_f, out);
+        nsb_simulator_step(out, r_f_steady_state, k_r_f, delta_t, nsb_state);
+        timestamp += delta_t;
       }      
     }
   }

@@ -27,66 +27,60 @@
 // Author: Josef Matous                                                     *
 //***************************************************************************
 
-#ifndef NSB_UTILITIES_HPP_
-#define NSB_UTILITIES_HPP_
+#ifndef NSB_OBSTACLE_ESTIMATOR_HPP_
+#define NSB_OBSTACLE_ESTIMATOR_HPP_
 
 // DUNE headers.
 #include <DUNE/DUNE.hpp>
+
+#include "Utilities.hpp"
 
 namespace NSB
 {
     using DUNE_NAMESPACES;
 
-    template <typename T>
-    inline T square(T x)
+    class ObstacleEstimator
     {
-      return x*x;
-    }
+      public:
+        ObstacleState m_obstacle_state;
 
-    struct Vector3D
-    {
-      double x, y, z;
-    };
+        ObstacleEstimator()
+        {        
+        }
 
-    struct Vector2D
-    {
-      double x, y;
-    };
+        //! Simulates the obstacle up to the given timestamp
+        inline void
+        simulate(double timestamp)
+        {
+          double delta_t = timestamp - m_obstacle_state.timestamp;
+          m_obstacle_state.timestamp = timestamp;
+          m_obstacle_state.x += m_obstacle_state.vx * delta_t;
+          m_obstacle_state.y += m_obstacle_state.vy * delta_t;
+        }
 
-    struct ObstacleState
-    {
-      double timestamp, x, y, vx, vy;
-    };
-    
-    inline double
-    dot(Vector2D a, Vector2D b)
-    {
-      return a.x*b.x + a.y*b.y;
-    }
+        //! Updates the obstacle state (including the timestamp)
+        inline void
+        update(const IMC::Target* msg, double lat0, double lon0)
+        {
+          m_obstacle_state.timestamp = msg->getTimeStamp();
+          m_obstacle_state.vx = msg->sog * std::cos(msg->cog);
+          m_obstacle_state.vy = msg->sog * std::sin(msg->cog);
+          WGS84::displacement(lat0, lon0, 0., msg->lat, msg->lon, 0., &m_obstacle_state.x, &m_obstacle_state.y);
+        }
 
-    inline double
-    norm(Vector3D a)
-    {
-      return std::sqrt(square(a.x) + square(a.y) + square(a.z));
-    }
-
-    inline double
-    norm(Vector2D a)
-    {
-      return std::sqrt(square(a.x) + square(a.y));
-    }
-
-    inline double
-    cross(Vector2D a, Vector2D b)
-    {
-      return a.x*b.y - b.x*a.y;
-    }
-
-    inline float
-    sign(double x)
-    {
-      return (x >= 0.) ? 1. : -1;
-    }
+        //! Get obstacle state at a given timestamp
+        inline void
+        get_obstacle_state(double timestamp, ObstacleState& output)
+        {
+          output.timestamp = timestamp;
+          output.vx = m_obstacle_state.vx;
+          output.vy = m_obstacle_state.vy;
+          
+          double delta_t = timestamp - m_obstacle_state.timestamp;
+          output.x = m_obstacle_state.x + delta_t*m_obstacle_state.vx;
+          output.y = m_obstacle_state.y + delta_t*m_obstacle_state.vy;
+        }
+    };    
 }
 
 #endif

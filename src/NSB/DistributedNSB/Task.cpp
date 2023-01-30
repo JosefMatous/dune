@@ -34,6 +34,8 @@
 #include "../LineOfSight.hpp"
 #include "../FormationKeeping.hpp"
 #include "../Utilities.hpp"
+#include "../ObstacleAvoidance.hpp"
+#include "../ObstacleEstimator.hpp"
 #include "NSBSimulator.hpp"
 #include "NSBConsensus.hpp"
 
@@ -70,6 +72,12 @@ namespace NSB
       CircularBuffer<NSBStateTimestamp> m_state_log;
       unsigned int m_state_counter;
 
+      // Obstacle avoidance
+      ObstacleAvoidance m_obs_avoid;
+      ObstacleEstimator m_obs_est;
+      double m_lat0, m_lon0;
+      bool m_has_obstacle;
+
       // External activation
       bool m_active;
       bool is_initialized;
@@ -88,6 +96,7 @@ namespace NSB
       {
         bind<IMC::EstimatedState>(this);
         bind<IMC::NSBMsg>(this);
+        bind<IMC::Target>(this);
 
         m_linstate.flags = IMC::DesiredLinearState::FL_VX | IMC::DesiredLinearState::FL_VY | IMC::DesiredLinearState::FL_VZ;
 
@@ -207,6 +216,15 @@ namespace NSB
           .minimumValue("1")
           .maximumValue("100");
 
+        param("Obstacle Avoidance -- Minimum Cone Angle", m_obs_avoid.m_cone_min)
+          .defaultValue("5")
+          .minimumValue("1")
+          .maximumValue("30");
+        param("Obstacle Avoidance -- Radius", m_obs_avoid.m_obstacle_radius)
+          .defaultValue("5")
+          .minimumValue("1")
+          .maximumValue("30");
+
         param("Steady-state Formation Radius", m_consensus_param.r_ss)
           .defaultValue("10");
         param("Formation Radius Time Constant", m_consensus_param.k_r)
@@ -269,6 +287,10 @@ namespace NSB
         {
           m_state_log.setCapacity(m_consensus_param.buffer_size);
         }
+        if (paramChanged(m_obs_avoid.m_cone_min))
+        {
+          m_obs_avoid.m_cone_min = Angles::radians(m_obs_avoid.m_cone_min);
+        }
       }
 
       void
@@ -294,6 +316,7 @@ namespace NSB
         m_transmission_couner = 0;
         m_state_log.clear();
         m_state_counter = m_consensus_param.decimation;
+        m_has_obstacle = false;
       }
 
       void
@@ -308,14 +331,7 @@ namespace NSB
 
           debug("Received timestamp: %.2f, Current timestamp: %.2f", s_recv.timestamp, m_current_state.timestamp);
 
-          try
-          {
-            nsb_consensus_update(s_recv, m_current_state, m_state_log, m_los, m_path, m_consensus_param);
-          }
-          catch(const std::runtime_error& e)
-          {
-            war(e.what());
-          }          
+          nsb_consensus_update(s_recv, m_current_state, m_state_log, m_obs_avoid, m_obs_est, m_los, m_path, m_consensus_param);       
 
           debug("Communications period set to %.1f seconds", m_consensus_param.comm_period);
           m_transmission_couner = 0;
@@ -323,8 +339,19 @@ namespace NSB
       }
 
       void
+      consume(const IMC::Target* msg)
+      {
+        m_obs_est.update(msg, m_lat0, m_lon0);
+        m_obs_est.simulate(Clock::getSinceEpoch());
+        m_has_obstacle = true;
+        //debug("Obstacle at x=%.1f, y=%.2f", m_obs_est.m_obstacle_state.x, m_obs_est.m_obstacle_state.y);
+      }
+
+      void
       consume(const IMC::EstimatedState* msg)
       {
+        m_lat0 = msg->lat;
+        m_lon0 = msg->lon;
         if (isActive())
         {
           double delta_t;
@@ -354,6 +381,10 @@ namespace NSB
               m_current_state.nsb_state.r_f = r_f;
           }
           m_current_state.timestamp = Clock::getSinceEpoch();
+          if (m_has_obstacle)
+          {
+            m_obs_est.simulate(m_current_state.timestamp);
+          }
 
           GeometricPath::PathReference path_ref;
           m_path.getPathReference(m_current_state.nsb_state.path_param, path_ref);
@@ -415,6 +446,13 @@ namespace NSB
 
           //debug("Path error: x = %.2f, y = %.2f", path_err.x, path_err.y);
           //debug("LOS vector: x = %.2f, y = %.2f, z = %.2f", los_out.velocity.x, los_out.velocity.y, los_out.velocity.z);
+
+          if (m_has_obstacle)
+          {
+            m_obs_avoid.step(m_current_state.nsb_state.x, m_current_state.nsb_state.y, 
+                            m_obs_est.m_obstacle_state, m_current_state.nsb_state.r_f, los_out);
+            //debug("LOS vector after OA: x = %.2f, y = %.2f, z = %.2f", los_out.velocity.x, los_out.velocity.y, los_out.velocity.z);
+          }
 
           Vector3D sigma;
           sigma.x = msg->x - m_current_state.nsb_state.x;
