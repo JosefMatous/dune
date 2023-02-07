@@ -42,7 +42,7 @@ namespace NSB
     class ObstacleAvoidance
     {
       private:
-        // Direction of obstacle avoidance from previous time-step (1=starboard, -1=port, 0=inactive)
+        //! Direction of obstacle avoidance from previous time-step (1=starboard, -1=port, 0=inactive)
         float m_last_direction;
 
         //! Returns true if the obstacle avoidance scheme was active in the previous step
@@ -58,6 +58,8 @@ namespace NSB
         double m_cone_min;
         //! Obstacle radius
         float m_obstacle_radius; 
+        //! Hysteresis of collision detection
+        double m_hysteresis;
 
         //! Initialize with default parameters
         ObstacleAvoidance():
@@ -71,6 +73,15 @@ namespace NSB
           m_last_direction(0.)
         {
           m_cone_min = cone_min;
+          m_hysteresis = 0.;
+        }    
+
+        //! Initialize with custom parameters
+        ObstacleAvoidance(double cone_min, double hysteresis):
+          m_last_direction(0.)
+        {
+          m_cone_min = cone_min;
+          m_hysteresis = hysteresis;
         }    
 
         //! Performs the obstacle avoidance algorithm.
@@ -99,8 +110,16 @@ namespace NSB
           }
           
           double speed = norm(relative_velocity);
+
+          bool hysteresis = false;
+          if (m_last_direction != 0. && m_hysteresis > 0.) // check for hysteresis
+          {
+            hysteresis = dot(relative_position, relative_velocity) >= std::cos(cone_angle + m_hysteresis) * speed * distance;
+          }
+
           bool is_in_cone = dot(relative_position, relative_velocity) >= std::cos(cone_angle) * speed * distance;
-          if (!is_in_cone)
+
+          if (!(hysteresis | is_in_cone))
           {
             m_last_direction = 0.;
             return;

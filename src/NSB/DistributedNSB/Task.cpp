@@ -224,6 +224,10 @@ namespace NSB
           .defaultValue("5")
           .minimumValue("1")
           .maximumValue("30");
+        param("Obstacle Avoidance -- Hysteresis", m_obs_avoid.m_hysteresis)
+          .defaultValue("3")
+          .minimumValue("0")
+          .maximumValue("10");
 
         param("Steady-state Formation Radius", m_consensus_param.r_ss)
           .defaultValue("10");
@@ -290,6 +294,10 @@ namespace NSB
         if (paramChanged(m_obs_avoid.m_cone_min))
         {
           m_obs_avoid.m_cone_min = Angles::radians(m_obs_avoid.m_cone_min);
+        }
+        if (paramChanged(m_obs_avoid.m_hysteresis))
+        {
+          m_obs_avoid.m_hysteresis = Angles::radians(m_obs_avoid.m_hysteresis);
         }
       }
 
