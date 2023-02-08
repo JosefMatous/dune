@@ -71,6 +71,7 @@ namespace NSB
       NSBStateTimestamp m_current_state;
       CircularBuffer<NSBStateTimestamp> m_state_log;
       unsigned int m_state_counter;
+      std::vector<float> m_initial_guess;
 
       // Obstacle avoidance
       ObstacleAvoidance m_obs_avoid;
@@ -366,11 +367,12 @@ namespace NSB
           double time_now = Clock::get();
           if (!is_initialized)
           {
-            // initialized the NSB state with current position
+            // initialized the NSB estimate
             m_current_state.nsb_state.path_param = 0.;
-            m_current_state.nsb_state.x = msg->x;
-            m_current_state.nsb_state.y = msg->y;
-            m_current_state.nsb_state.z = msg->depth;
+            /* ad hoc solution -- we know that the initial path heading is pi/2 */
+            m_current_state.nsb_state.x = msg->x + m_form.p_form.x;
+            m_current_state.nsb_state.y = msg->y - m_form.p_form.y;
+            m_current_state.nsb_state.z = msg->depth - m_form.p_form.z;
             m_current_state.nsb_state.r_f = 0.;
 
             m_last_step.reset();
@@ -383,11 +385,12 @@ namespace NSB
           else
           {
             delta_t = m_last_step.getDelta();
-            // update estimate of formation radius
-            float r_f = std::sqrt(square(msg->x - m_current_state.nsb_state.x) + square(msg->y - m_current_state.nsb_state.y));
-            if (r_f > m_current_state.nsb_state.r_f)
-              m_current_state.nsb_state.r_f = r_f;
           }
+          // update estimate of formation radius
+          float r_f = std::sqrt(square(msg->x - m_current_state.nsb_state.x) + square(msg->y - m_current_state.nsb_state.y));
+          if (r_f > m_current_state.nsb_state.r_f)
+            m_current_state.nsb_state.r_f = r_f;
+
           m_current_state.timestamp = Clock::getSinceEpoch();
           if (m_has_obstacle)
           {

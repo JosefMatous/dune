@@ -13,9 +13,9 @@ $DUNE_ACTIVATE localhost 6003 "Path Control" false
 $DUNE_ACTIVATE localhost 6003 "Distributed NSB" false
 
 # Simulator 3
-$DUNE_ACTIVATE localhost 6004 "Path Control" true
-$DUNE_ACTIVATE localhost 6004 "Distributed NSB" true
+$DUNE_ACTIVATE localhost 6004 "Path Control" false
+$DUNE_ACTIVATE localhost 6004 "Distributed NSB" false
 
 # Simulator 4
-$DUNE_ACTIVATE localhost 6005 "Path Control" true
-$DUNE_ACTIVATE localhost 6005 "Distributed NSB" true
+$DUNE_ACTIVATE localhost 6005 "Path Control" false
+$DUNE_ACTIVATE localhost 6005 "Distributed NSB" false
