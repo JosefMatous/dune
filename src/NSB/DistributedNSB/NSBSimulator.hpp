@@ -36,7 +36,7 @@ namespace NSB
     }
 
     inline void
-    convert(IMC::NSBMsg& src, NSBState& dst) 
+    convert(const IMC::NSBMsg& src, NSBState& dst) 
     {
       dst.x = src.x;
       dst.y = src.y;

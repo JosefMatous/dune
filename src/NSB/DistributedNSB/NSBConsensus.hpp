@@ -28,7 +28,7 @@ namespace NSB
     };
 
     inline void
-    convert(IMC::NSBMsg& src, NSBStateTimestamp& dst) 
+    convert(const IMC::NSBMsg& src, NSBStateTimestamp& dst) 
     {
       convert(src, dst.nsb_state);
       dst.timestamp = src.getTimeStamp();
@@ -63,6 +63,7 @@ namespace NSB
       double delta_t;
       float comm_period;
       unsigned int buffer_size, decimation;
+      double delay, packet_loss;
     };
 
     //! Returns the index of the first element in `log` whose timestamp is larger than the timstamp of `x`.

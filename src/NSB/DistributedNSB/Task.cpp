@@ -73,6 +73,10 @@ namespace NSB
       unsigned int m_state_counter;
       std::vector<float> m_initial_guess;
 
+      CircularBuffer<IMC::NSBMsg> m_message_buffer;
+      CircularBuffer<bool> m_message_processed;
+      Random::MT19937 m_rng;
+
       // Obstacle avoidance
       ObstacleAvoidance m_obs_avoid;
       ObstacleEstimator m_obs_est;
@@ -93,7 +97,10 @@ namespace NSB
         m_path(0, 0, 0., 50., 30., 0., 0, 0., false, M_PI_2, 0.),
         m_los(15., false, 1.3, 0.5),
         m_form(0., 0., 0., 0.25, 0.5),
-        m_state_log(1)
+        m_state_log(1),
+        m_message_buffer(10),
+        m_message_processed(10),
+        m_rng()
       {
         bind<IMC::EstimatedState>(this);
         bind<IMC::NSBMsg>(this);
@@ -216,6 +223,13 @@ namespace NSB
           .defaultValue("30")
           .minimumValue("1")
           .maximumValue("100");
+        param("Consensus -- Artificial Delay", m_consensus_param.delay)
+          .defaultValue("10")
+          .minimumValue("0");
+        param("Consensus -- Artificial Packet Loss", m_consensus_param.packet_loss)
+          .defaultValue("0.1")
+          .minimumValue("0")
+          .maximumValue("1");
 
         param("Obstacle Avoidance -- Minimum Cone Angle", m_obs_avoid.m_cone_min)
           .defaultValue("5")
@@ -328,12 +342,12 @@ namespace NSB
         m_has_obstacle = false;
       }
 
-      void
-      consume(const IMC::NSBMsg* msg)
+      inline void
+      processNSBMsg(const IMC::NSBMsg& msg)
       {
-        if (isActive() && is_initialized && (msg->getSource() != getSystemId()))
-        {
-          debug("Received consensus message from %s", resolveSystemId(msg->getSource()));
+        //if (isActive() && is_initialized && (msg.getSource() != getSystemId()))
+        //{
+          debug("Received consensus message from %s", resolveSystemId(msg.getSource()));
 
           NSBStateTimestamp s_recv;
           convert(msg, s_recv);
@@ -344,6 +358,23 @@ namespace NSB
 
           debug("Communications period set to %.1f seconds", m_consensus_param.comm_period);
           m_transmission_couner = 0;
+        //}
+      }
+
+      void
+      consume(const IMC::NSBMsg* msg)
+      {
+        if (isActive() && is_initialized && (msg->getSource() != getSystemId()))
+        {
+          if (m_rng.uniform() >= m_consensus_param.packet_loss)
+          {
+            m_message_buffer.add(*msg);
+            m_message_processed.add(false);
+          }
+          else
+          {
+            debug("Packet dropped");
+          }
         }
       }
 
@@ -356,6 +387,20 @@ namespace NSB
         //debug("Obstacle at x=%.1f, y=%.2f", m_obs_est.m_obstacle_state.x, m_obs_est.m_obstacle_state.y);
       }
 
+      inline void
+      consensusCheck(void)
+      {
+        for (unsigned i = 0; i < m_message_buffer.getSize(); i++)
+        {
+          if (!m_message_processed(i) && (m_current_state.timestamp >= m_message_buffer(i).getTimeStamp() + m_consensus_param.delay))
+          {
+            processNSBMsg(m_message_buffer(i));
+            m_message_processed(i) = true;
+            return;
+          }
+        }        
+      }
+
       void
       consume(const IMC::EstimatedState* msg)
       {
@@ -364,7 +409,7 @@ namespace NSB
         if (isActive())
         {
           double delta_t;
-          double time_now = Clock::get();
+          double time_now = Clock::get();          
           if (!is_initialized)
           {
             // initialized the NSB estimate
@@ -386,12 +431,14 @@ namespace NSB
           {
             delta_t = m_last_step.getDelta();
           }
+          m_current_state.timestamp = Clock::getSinceEpoch();
+          consensusCheck();
+
           // update estimate of formation radius
           float r_f = std::sqrt(square(msg->x - m_current_state.nsb_state.x) + square(msg->y - m_current_state.nsb_state.y));
           if (r_f > m_current_state.nsb_state.r_f)
             m_current_state.nsb_state.r_f = r_f;
 
-          m_current_state.timestamp = Clock::getSinceEpoch();
           if (m_has_obstacle)
           {
             m_obs_est.simulate(m_current_state.timestamp);
@@ -416,22 +463,8 @@ namespace NSB
           // Dispatch NSB message
           if ((time_now - m_last_transmission >= m_consensus_param.comm_period) && (m_transmission_couner < m_consensus_param.trans_limit))
           {
-            /* This is the correct way of doing it */
-            /*convert(m_current_state, m_nsb_msg);
-            dispatch(m_nsb_msg);*/
-
-            /* This is done to introduce artificial delay into the system */
-            if (m_state_log.getSize() >= 6)
-            {
-              convert(m_state_log(m_state_log.getSize() - 6), m_nsb_msg);
-              m_nsb_msg.setTimeStamp(m_state_log(m_state_log.getSize() - 6).timestamp);
-              dispatch(m_nsb_msg, DF_KEEP_TIME);
-            }
-            else
-            {
-              convert(m_current_state, m_nsb_msg);
-              dispatch(m_nsb_msg);
-            }
+            convert(m_current_state, m_nsb_msg);
+            dispatch(m_nsb_msg);
 
             m_last_transmission = time_now;
             m_transmission_couner++;
