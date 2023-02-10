@@ -54,6 +54,12 @@ namespace NSB
           setParameters(a, b, angle, x0, y0);
         }
 
+        //! Default constructor
+        CollisionEllipse(void)
+        {
+          setParameters(T(), T(), T(), T(), T());
+        }
+
         inline void
         setParameters(T a, T b, T angle, T x0, T y0)
         {

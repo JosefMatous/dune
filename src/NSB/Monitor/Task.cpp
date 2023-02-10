@@ -48,32 +48,33 @@ namespace NSB
       struct 
       {
         //! Collision ellipse origin.
-        float x0, y0;
+        std::vector<float> x0, y0;
         //! Collision ellipse orientation.
-        float angle;
+        std::vector<float> angle;
         //! Collision ellipse axes.
-        float a, b;
+        std::vector<float> a, b;
         //! True if the vehicle should remain inside the collision ellipse.
-        bool inside;
+        std::vector<bool> inside;
+        //! True if the operation limits are an intersection of ellipses, false for union
+        bool intersection;
         //! Timeout for task deactivation.
         double timeout;
       } m_params;
 
-      CollisionEllipse<float> m_ellipse;
+      std::vector<CollisionEllipse<float>> m_ellipses;
       double m_last_msg_time;
 
       //! Constructor.
       //! @param[in] name task name.
       //! @param[in] ctx context.
       Task(const std::string& name, Tasks::Context& ctx):
-        DUNE::Tasks::Task(name, ctx),
-        m_ellipse(50., 30., 0., 0., 0.)
+        DUNE::Tasks::Task(name, ctx)
       {
-        param("Semimajor axis", m_params.a)
+        param("Semimajor axes", m_params.a)
           .defaultValue("50");
-        param("Semiminor axis", m_params.b)
+        param("Semiminor axes", m_params.b)
           .defaultValue("30");
-        param("Orientation", m_params.angle)
+        param("Orientations", m_params.angle)
           .defaultValue("0");
         param("Origin x", m_params.x0)
           .defaultValue("0");
@@ -81,8 +82,10 @@ namespace NSB
           .defaultValue("0");
         param("Inside", m_params.inside)
           .defaultValue("true");   
+        param("Intersection", m_params.intersection)
+          .defaultValue("true");   
         param("Timeout", m_params.timeout)
-          .defaultValue("10");
+          .defaultValue("1");
 
         m_last_msg_time = -1.;
 
@@ -93,7 +96,22 @@ namespace NSB
       void
       onUpdateParameters(void)
       {
-        m_ellipse.setParameters(m_params.a, m_params.b, m_params.angle, m_params.x0, m_params.y0);
+        if (paramChanged(m_params.a) || paramChanged(m_params.b) || paramChanged(m_params.angle) || paramChanged(m_params.x0) || paramChanged(m_params.y0))
+        {
+          size_t n_ellipses = m_params.a.size();
+          if ((m_params.b.size() != n_ellipses) || (m_params.angle.size() != n_ellipses) || (m_params.x0.size() != n_ellipses) || (m_params.y0.size() != n_ellipses))
+          {
+            war("Incompatible size of parameter vectors");
+            return;
+          }
+          if (m_ellipses.size() != n_ellipses)
+            m_ellipses.resize(n_ellipses);
+
+          for (size_t i = 0; i < n_ellipses; i++)
+          {
+            m_ellipses[i] = CollisionEllipse<float>(m_params.a[i], m_params.b[i], m_params.angle[i], m_params.x0[i], m_params.y0[i]);
+          }          
+        }
       }
 
       void
@@ -123,10 +141,18 @@ namespace NSB
           }
 
           bool is_in_limits;
-          if (m_params.inside)
-            is_in_limits = m_ellipse.isInside(msg->x, msg->y);
+          if (m_params.intersection)
+          {
+            is_in_limits = true;
+            for (size_t i = 0; i < m_ellipses.size(); i++)
+              is_in_limits &= (m_params.inside[i]) ? m_ellipses[i].isInside(msg->x, msg->y) : m_ellipses[i].isOutside(msg->x, msg->y);
+          }
           else
-            is_in_limits = m_ellipse.isOutside(msg->x, msg->y);
+          {
+            is_in_limits = false;
+            for (size_t i = 0; i < m_ellipses.size(); i++)
+              is_in_limits |= (m_params.inside[i]) ? m_ellipses[i].isInside(msg->x, msg->y) : m_ellipses[i].isOutside(msg->x, msg->y);
+          }
 
           if (!is_in_limits)
           {
