@@ -27,8 +27,8 @@
 // Author: Josef Matous                                                     *
 //***************************************************************************
 
-#ifndef CONSENSUS_HAND_POSITION_HPP
-#define CONSENSUS_HAND_POSITION_HPP
+#ifndef CONSENSUS_SPEED_BARRIER_HPP
+#define CONSENSUS_SPEED_BARRIER_HPP
 
 // DUNE headers.
 #include <DUNE/DUNE.hpp>
@@ -38,61 +38,75 @@ namespace Consensus
 {
   using DUNE_NAMESPACES;
 
-  struct HandPosition
-  {
-    float x, y, x_dot, y_dot;
-  };
-  
-  //! Calculates hand position from estimated state
-  inline void 
-  get_hand_position(const IMC::EstimatedState* estate, float h, HandPosition* destination)
-  {
-    float c_psi = std::cos(estate->psi);
-    float s_psi = std::sin(estate->psi);
-    destination->x = estate->x + h*c_psi;
-    destination->y = estate->y + h*s_psi;
-    destination->x_dot = estate->u*c_psi - estate->v*s_psi - h*s_psi*estate->r;
-    destination->y_dot = estate->u*s_psi + estate->v*c_psi + h*c_psi*estate->r;
-  }
-
-  class HandPositionController
+  class SpeedBarrier
   {
   private:
-    float last_direction;
+    //! Previous measured surge velocity
+    float u_prev;
+    //! Extra surge velocity
+    float u_add;
+    //! Integral state
+    float rho;
+    //! Time delta
+    Time::Delta m_delta;
   public:
-    float U_min, U_max, r_max, h;
+    //! Speed gain
+    float m_k_u;
+    //! Time-constant
+    float m_k_rho;
+    //! Offset
+    float m_sigma;
+    //! Max. tau
+    float m_tau_max;
 
-    HandPositionController(float U_min_, float U_max_, float r_max_, float h_)
+    SpeedBarrier(float k_u, float k_rho, float sigma, float tau_max)
     {
-      U_min = U_min_;
-      U_max = U_max_;
-      r_max = r_max_;
-      h = h_;
-      last_direction = 1.; // prefer forward motion
+      m_k_u = k_u;
+      m_k_rho = k_rho;
+      m_sigma = sigma;
+      m_tau_max = tau_max;
+      rho = 0.; 
     }
 
-    HandPositionController(void):
-      HandPositionController(0.4, 2., 1., 1.) {}
+    //! Initialize with default parameters
+    SpeedBarrier(void):
+      SpeedBarrier(0.1, 4., 0.3, 1.) {}
+
+    //! One step of the algorithm
+    void
+    step(Vector2D* mu, float u, float psi)
+    {
+      float s_psi = std::sin(psi);
+      float c_psi = std::cos(psi);
+      float u_ref = mu->x*c_psi + mu->y*s_psi;
+
+      double delta_t = m_delta.getDelta();
+      if (delta_t > 0.)
+      {
+        float tau = std::abs(u_ref - u_prev) / delta_t;
+        float rho_dot = -m_k_rho*rho + 0.5*(1 - std::tanh(m_sigma - tau))*tau;
+        rho += rho_dot * delta_t;
+      }
+
+      float d = rho + u + 1.;
+      float tau_add = m_k_u * std::pow(d*d - d, -1.);
+      if (tau_add >= 0.)
+        tau_add = trimValue(std::abs(tau_add), 0.F, m_tau_max);
+      else // we are in the infeasible region
+        tau_add = m_tau_max;
+
+      mu->x += tau_add*c_psi;
+      mu->y -= tau_add*s_psi;
+
+      u_prev = u_ref;
+    }
 
     inline void
-    get_references(const Vector2D* v_d, const IMC::EstimatedState* estate, IMC::DesiredSpeed* u_ref, IMC::DesiredHeadingRate* r_ref)
+    reset(void)
     {
-      float c_psi = std::cos(estate->psi);
-      float s_psi = std::sin(estate->psi);
-
-      float u_d = trimValue(v_d->x*c_psi + v_d->y*s_psi, -U_max, U_max);
-      if (std::abs(u_d) < U_min) // hysteresis
-      {
-        u_d = last_direction * U_min;
-      }
-      else
-      {
-        last_direction = (u_d > 0.) ? 1. : -1.;
-      }
-      u_ref->value = u_d;
-      u_ref->speed_units = IMC::SUNITS_METERS_PS;
-
-      r_ref->value = trimValue((v_d->y*c_psi - v_d->x*s_psi - estate->v) / h, -r_max, r_max);
+      rho = 0.;
+      u_add = 0.;
+      m_delta.clear();
     }
   };  
 }

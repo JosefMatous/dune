@@ -66,6 +66,8 @@ namespace Control
         int16_t max_accel;
         //! MPS controller feedforward gain
         float mps_ffgain;
+        //! MPS controller feedforward gain in reverse
+        float mps_ffgain_rev;
         //! PID gains for RPM controller
         std::vector<float> rpm_gains;
         //! PID gains for MPS controller
@@ -161,7 +163,7 @@ namespace Control
           .description("Minimum thrust limit");
 
           param("Minimum RPM Limit", m_args.min_rpm)
-          .defaultValue("200")
+          .defaultValue("-1700")
           .units(Units::RPM)
           .description("Minimum value admissible for desired RPMs");
 
@@ -221,6 +223,7 @@ namespace Control
               paramChanged(m_args.mps_gains) ||
               paramChanged(m_args.rpm_ffgain) ||
               paramChanged(m_args.mps_ffgain) ||
+              paramChanged(m_args.mps_ffgain_rev) ||
               paramChanged(m_args.max_int_mps) ||
               paramChanged(m_args.max_thrust) ||
               paramChanged(m_args.min_thrust) ||
@@ -418,7 +421,7 @@ namespace Control
             m_desired_gvel = m_desired_speed;
 
           // if desired speed is too low just turn off motor
-          if (m_desired_gvel < c_mps_tol)
+          if (std::abs(m_desired_gvel) < c_mps_tol)
           {
             m_desired_rpm = 0.0;
             m_previous_rpm = m_desired_rpm;
@@ -441,6 +444,7 @@ namespace Control
 
           // trim rpm value
           m_desired_rpm = Math::trimValue(m_desired_rpm, m_args.min_rpm, m_args.max_rpm);
+          //debug("RPM trimmed to %f", m_desired_rpm);
 
           m_previous_rpm = m_desired_rpm;
         }

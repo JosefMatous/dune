@@ -32,6 +32,7 @@
 #include "../Utility.hpp"
 #include "../EdgeConsensus.hpp"
 #include "../HandPosition.hpp"
+#include "../SpeedBarrier.hpp"
 
 namespace Consensus
 {
@@ -64,6 +65,8 @@ namespace Consensus
         float d_max;
         //! Maximum velocity reference
         float U_max;
+        //! Minimum velocity reference
+        float U_min;
         //! Maximum yaw rate reference
         float r_max;
         //! Leader name
@@ -74,7 +77,12 @@ namespace Consensus
         float dummy_h;
         //! Dummy reference frequency
         int dummy_freq;
+        //! Use speed barrier function
+        bool use_barrier;
       } m_params;
+
+      SpeedBarrier m_speed_barrier;
+      HandPositionController m_controller;
 
       Vector2D m_hand_velocity_reference;
       IMC::DesiredHeadingRate m_yaw_rate;
@@ -101,12 +109,12 @@ namespace Consensus
         bind<IMC::EstimatedState>(this);
         bind<IMC::ConsensusPacket>(this);
 
-        param("Hand Length", m_params.h)
+        param("Hand Length", m_controller.h)
           .defaultValue("1");
         param("Formation Keeping Gain", m_params.c)
           .defaultValue("0.1");
         param("Constraint Gain", m_params.rho)
-          .defaultValue("0.5");
+          .defaultValue("5");
         param("Formation Offset x", m_params.offset.x)
           .defaultValue("0");
         param("Formation Offset y", m_params.offset.y)
@@ -115,24 +123,36 @@ namespace Consensus
           .defaultValue("5");
         param("Maximum Distance", m_params.d_max)
           .defaultValue("50");
-        param("Maximum Speed Reference", m_params.U_max)
+        param("Maximum Speed Reference", m_controller.U_max)
           .defaultValue("2");
+        param("Minimum Speed Reference", m_controller.U_min)
+          .defaultValue("0.4");
         param("Active", m_active)
           .defaultValue("false");
         param("Leader", m_params.leader_name)
           .defaultValue("lauv-simulator-1");
-        param("Maximum Yaw Rate", m_params.r_max)
+        param("Maximum Yaw Rate", m_controller.r_max)
           .defaultValue("1");
         param("Dummy Reference -- Lookahead Distance", m_params.dummy_h)
           .defaultValue("50");
         param("Dummy Reference -- Decimation", m_params.dummy_freq)
           .defaultValue("10");
+        param("Use Speed Barrier", m_params.use_barrier)
+          .defaultValue("false");
+        param("Speed Barrier -- Gain", m_speed_barrier.m_k_u)
+          .defaultValue("0.1");
+        param("Speed Barrier -- Time Constant", m_speed_barrier.m_k_rho)
+          .defaultValue("4");
+        param("Speed Barrier -- Offset", m_speed_barrier.m_sigma)
+          .defaultValue("0.3");
 
         is_initialized = false;
         m_z_ref.value = 0;
         m_z_ref.z_units = IMC::Z_DEPTH;
 
         m_dummy_reference.flags = IMC::Reference::FLAG_LOCATION | IMC::Reference::FLAG_Z;
+        m_dummy_reference.setSource(0x40ca);
+        m_dummy_reference.setSourceEntity(0xff);
         m_dummy_counter = m_params.dummy_freq;
       }
 
@@ -145,6 +165,11 @@ namespace Consensus
         debug("Leader %s resolved as %u", m_params.leader_name.c_str(), m_params.leader_id);
 
         m_dummy_counter = m_params.dummy_freq;
+
+        if (paramChanged(m_active))
+        {
+          m_speed_barrier.reset();
+        }
 
         /*if (m_active != isActive())
         {
@@ -204,8 +229,11 @@ namespace Consensus
           } else
           {
             edge_consensus(&m_own_hand, &m_target_hand, &m_params.offset, m_params.c, m_params.rho, m_params.d_min, m_params.d_max, &m_hand_velocity_reference);
+            debug("Hand velocity reference: (%.2f, %.2f)", m_hand_velocity_reference.x, m_hand_velocity_reference.y);
+            if (m_params.use_barrier)
+              m_speed_barrier.step(&m_hand_velocity_reference, state.u, state.psi);
           }
-          hand_velocity_controller(&m_hand_velocity_reference, &state, m_params.h, m_params.U_max, m_params.r_max, &m_speed, &m_yaw_rate);
+          m_controller.get_references(&m_hand_velocity_reference, &state, &m_speed, &m_yaw_rate);
           dispatch(m_speed); 
           dispatch(m_yaw_rate);
           dispatch(m_z_ref);
@@ -217,7 +245,7 @@ namespace Consensus
       { 
         PathController::consume(msg);
 
-        get_hand_position(msg, m_params.h, &m_own_hand);
+        get_hand_position(msg, m_controller.h, &m_own_hand);
         m_lat = msg->lat;
         m_lon = msg->lon;
         is_initialized = true;
@@ -245,12 +273,12 @@ namespace Consensus
             WGS84::displace(m_own_hand.x + m_hand_velocity_reference.x*m_params.dummy_h*hand_velocity_norm_inv, 
                             m_own_hand.y + m_hand_velocity_reference.y*m_params.dummy_h*hand_velocity_norm_inv,
                             &m_dummy_reference.lat, &m_dummy_reference.lon);
-            dispatch(m_dummy_reference);
+            dispatch(m_dummy_reference, DF_KEEP_SRC_EID);
           }
 
 
           /*edge_consensus(&m_own_hand, &m_target_hand, &m_params.offset, m_params.c, m_params.rho, m_params.d_min, m_params.d_max, &m_hand_velocity_reference);
-          hand_velocity_controller(&m_hand_velocity_reference, &m_estate, m_params.h, m_params.U_max, m_params.r_max, &m_speed, &m_yaw_rate);
+          hand_velocity_controller(&m_hand_velocity_reference, &m_estate, m_controller.h, m_params.U_max, m_params.r_max, &m_speed, &m_yaw_rate);
 
           dispatch(m_speed);
           dispatch(m_yaw_rate);

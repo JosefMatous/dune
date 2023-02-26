@@ -1,7 +1,7 @@
 #! /bin/bash
 
 # Path to `dune-activate` executable
-DUNE_ACTIVATE=/home/josefma/dune-workspace/dune/build/dune-activate
+DUNE_ACTIVATE=~/dune-workspace/edge-consensus/dune/build/dune-activate
 
 # Simulator 1
 $DUNE_ACTIVATE localhost 6002 "Path Control" true

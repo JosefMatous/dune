@@ -64,7 +64,8 @@ namespace Simulators
     Vehicle::applyControlForces(void)
     {
       double f[6];
-      double speed = std::sqrt(std::pow(m_linear_velocity[0], 2) +
+      double dir = (m_linear_velocity[0] >= 0.) ? 1. : -1.;
+      double speed = dir * std::sqrt(std::pow(m_linear_velocity[0], 2) +
                                std::pow(m_linear_velocity[1], 2) +
                                std::pow(m_linear_velocity[2], 2));
 

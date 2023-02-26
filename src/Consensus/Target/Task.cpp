@@ -79,9 +79,9 @@ namespace Consensus
         param("Radiues", m_params.r)
           .defaultValue("50");
         param("Origin Latitude", m_params.lat)
-          .defaultValue("0.7188178");
+          .defaultValue("0.71882959");
         param("Origin Longitude", m_params.lon)
-          .defaultValue("-0.15193965");
+          .defaultValue("-0.15195186");
         param("Initial Phase", m_params.phi0)
           .defaultValue("0");
         param("Direction", m_params.direction)

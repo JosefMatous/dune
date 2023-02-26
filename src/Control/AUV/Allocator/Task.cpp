@@ -405,6 +405,7 @@ namespace Control
           double m_s = m_args.ms_minimum;
           double rpm = rpm_m/1000, m_s_m = m_s;
           float angroll = 0 ;
+          //float dir = 1.; // forward/backward
           if(m_last_rpm!=NULL)
           {
             rpm_m = (double)m_last_rpm->value;
@@ -419,7 +420,9 @@ namespace Control
             m_s_m = (double) m_last_estimated_state->u;
             trimValueMod( m_s_m , m_args.ms_minimum, m_args.max_ms);
             m_avg_ms->update(m_s_m);
-            m_s = m_avg_ms->mean();   
+            m_s = m_avg_ms->mean(); 
+            //dir = (m_s >= 0.) ? 1. : -1.;
+            //debug("Direction %f", dir); 
           }
 
           // Allocate N
