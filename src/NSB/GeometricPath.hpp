@@ -40,6 +40,11 @@ namespace NSB
 
     class GeometricPath {
       public:
+        //! Path function and its first and seconds partial derivatives, evaluated at a given point
+        struct PathPoint{
+          Vector3D p, p_diff, p_ddiff;
+        };
+
         struct PathReference {
           double x, y, z;
           double theta, psi;
@@ -48,7 +53,36 @@ namespace NSB
         };
 
         inline virtual void
-        getPathReference(double path_parameter, PathReference& ref) = 0;
+        evaluatePathFunction(double path_parameter, PathPoint& output) = 0;
+
+        inline void
+        getPathReference(double path_parameter, PathReference& ref)
+        {
+          PathPoint point;
+          evaluatePathFunction(path_parameter, point);
+          getPathReference(point, ref);
+        }
+
+        inline static void
+        getPathReference(PathPoint point, PathReference& ref)
+        {
+          ref.x = point.p.x;
+          ref.y = point.p.y;
+          ref.z = point.p.z;
+
+          // Path-tangential angles
+          ref.gradient = norm(point.p_diff);
+          ref.theta = -std::asin(point.p_diff.z / ref.gradient);
+          ref.psi = std::atan2(point.p_diff.y, point.p_diff.x);
+
+          // Curvature == partial of path-tangential angles
+          double gradient_diff = dot(point.p_diff, point.p_ddiff) / ref.gradient;
+          double denominator = 1. / std::sqrt(square(ref.gradient) - square(point.p_diff.z));
+          ref.kappa = -point.p_ddiff.z*denominator + gradient_diff*denominator/ref.gradient; // diff(ref.theta)
+
+          denominator = 1. / (square(point.p_diff.x) + square(point.p_diff.y));
+          ref.iota = (point.p_diff.x*point.p_ddiff.y - point.p_diff.y*point.p_ddiff.x) * denominator; // diff(ref.psi)
+        }
 
         inline static void
         getPathFollowingError(PathReference ref, double x_vehicle, double y_vehicle, double z_vehicle, Vector3D& path_err)
@@ -118,7 +152,7 @@ namespace NSB
         }
 
         inline void
-        getPathReference(double s, PathReference& ref)
+        evaluatePathFunction(double s, PathPoint& p)
         {
           // Calculate path argument
           double direction = m_clockwise ? 1. : -1;
@@ -135,44 +169,34 @@ namespace NSB
           // Rotate by ellipse orientation
           double c_psi = std::cos(m_psi);
           double s_psi = std::sin(m_psi);
-          ref.x = x0*c_psi - y0*s_psi;
-          ref.y = y0*c_psi + x0*s_psi;
+          p.p.x = x0*c_psi - y0*s_psi;
+          p.p.y = y0*c_psi + x0*s_psi;
           double z_ned = m_z_center + z0;    
 
-          // Calculate derivatives
+          // Calculate derivatives in x and y
           double x0_dot = -direction*m_a*s_arg;
           double y0_dot =  direction*m_b*c_arg;
+          p.p_diff.x = x0_dot*c_psi - y0_dot*s_psi;
+          p.p_diff.y = y0_dot*c_psi + x0_dot*s_psi;
+
           //double x0_ddot = -x0;
           //double y0_ddot = -y0;
+          p.p_ddiff.x = -x0*c_psi + y0*s_psi;
+          p.p_ddiff.y = -y0*c_psi - x0*s_psi;
 
-          // Gradient and pitch angle
-          double denominator;
+          // Derivatives in z
           if ((z_ned > 0) && (m_c > 0))
           {
-            ref.z = z_ned;
-            double z0_dot = m_z_freq*m_c*std::cos(z_arg);
-            ref.gradient = std::sqrt(square(x0_dot) + square(y0_dot) + square(z0_dot));
-            ref.theta = -std::asin(z0_dot / ref.gradient);
-
-            // Vertical curvature == partial of ref.theta w.r.t. s
-            double z0_ddot = -m_z_freq*m_z_freq*m_c*std::sin(z_arg);
-            double gradient_diff = (-x0*x0_dot - y0*y0_dot + z0_ddot*z0_dot) / ref.gradient;
-            denominator = 1. / std::sqrt(square(ref.gradient) - square(z0_dot));
-            ref.kappa = -z0_ddot*denominator + gradient_diff*denominator/ref.gradient;
+            p.p.z = z_ned;
+            p.p_diff.z = m_z_freq*m_c*std::cos(z_arg);
+            p.p_ddiff.z = -m_z_freq*m_z_freq*m_c*std::sin(z_arg);
           }
           else
           { // saturate to zero if the reference depth is negative
-            ref.z = 0.;
-            ref.gradient = std::sqrt(square(x0_dot) + square(y0_dot));
-            ref.theta = 0.;
-            ref.kappa = 0.;
+            p.p.z = 0.;
+            p.p_diff.z = 0.;
+            p.p_ddiff.z = 0.;
           }
-          // Path yaw angle
-          ref.psi = m_psi + std::atan2(y0_dot, x0_dot);
-
-          // Horizontal curvature == partial of ref.psi w.r.t. s
-          denominator = 1. / (square(x0_dot) + square(y0_dot));
-          ref.iota = (x0*y0_dot - y0*x0_dot) * denominator;
         }
     };
 }

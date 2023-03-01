@@ -46,6 +46,14 @@ namespace NSB
     struct Vector3D
     {
       double x, y, z;
+
+      //! Initializes the vector with given values.
+      Vector3D(double xx, double yy, double zz):
+        x(xx), y(yy), z(zz) {}
+
+      //! Creates a vector of zeros.
+      Vector3D(void):
+        Vector3D(0., 0., 0.) {}
     };
 
     struct Vector2D
@@ -62,6 +70,12 @@ namespace NSB
     dot(Vector2D a, Vector2D b)
     {
       return a.x*b.x + a.y*b.y;
+    }
+
+    inline double
+    dot(Vector3D a, Vector3D b)
+    {
+      return a.x*b.x + a.y*b.y + a.z*b.z;
     }
 
     inline double

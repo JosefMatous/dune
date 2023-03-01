@@ -1,8 +1,8 @@
 #! /bin/bash
 
 # Path to DUNE and Neptus
-DUNE=~/dune-workspace-NTNU/dune/build/dune
-NEPTUS_DIR=~/dune-workspace-NTNU/neptus
+DUNE=~/dune-workspace/dune/build/dune
+NEPTUS_DIR=~/dune-workspace/neptus
 
 for i in {1..4}
 do

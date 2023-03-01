@@ -32,8 +32,12 @@
 
 #include "../GeometricPath.hpp"
 #include "../LineOfSight.hpp"
+#include "../ObstacleAvoidance.hpp"
+#include "../ObstacleEstimator.hpp"
 #include "../Utilities.hpp"
 #include "NSBSimulator.hpp"
+#include "NSBConsensus.hpp"
+#include "Utilities.hpp"
 
 namespace NSB
 {
@@ -49,15 +53,26 @@ namespace NSB
     {
       Ellipse m_path;
       LineOfSight m_los;
-      float m_r_ss, m_k_r;
-      float k_position, k_param;
-      double m_path_parameter;
+      ObstacleAvoidance m_obs_avoid;
+      ObstacleEstimator m_obs_est;
+      EstimatorParameters m_params;
       Delta m_last_step;
 
-      IMC::NSBMsg m_nsb_msg;
-      NSBState m_nsb_state;
+      double m_p0;
+      Vector3D m_initial_guess_offset;
 
-      bool is_initialized, m_active;
+      IMC::NSBMsg m_nsb_msg;   // consensus message (sent to others)
+      IMC::NSBState m_nsb_est; // state message (sent to self)
+      StateEstimate m_nsb_state, m_received_nsb_state;
+
+      double m_lat0, m_lon0;
+
+      int m_transmission_limit, m_transmission_counter;
+      double m_transmission_delay, m_last_transmission;
+
+      double m_current_timestamp;
+
+      bool is_initialized, m_active, m_has_obstacle;
 
       //! Constructor.
       //! @param[in] name task name.
@@ -69,6 +84,11 @@ namespace NSB
       {
         bind<IMC::EstimatedState>(this);
         bind<IMC::NSBMsg>(this);
+        bind<IMC::Target>(this);
+
+        m_params.los = &m_los;
+        m_params.path = &m_path;
+        m_params.oa = &m_obs_avoid;
 
         param("Ellipse -- Origin x", m_path.m_x_center)
           .defaultValue("0")
@@ -129,20 +149,45 @@ namespace NSB
           .maximumValue("2.")
           .description("Path parameter update gain");
 
-        param("Consensus -- Position Gain", k_position)
-          .defaultValue("0.3")
-          .minimumValue("0.")
-          .maximumValue("1.");
+        param("Obstacle Avoidance -- Minimum Cone Angle", m_obs_avoid.m_cone_min)
+          .defaultValue("5")
+          .minimumValue("1")
+          .maximumValue("30");
+        param("Obstacle Avoidance -- Radius", m_obs_avoid.m_obstacle_radius)
+          .defaultValue("5")
+          .minimumValue("1")
+          .maximumValue("30");
+        param("Obstacle Avoidance -- Hysteresis", m_obs_avoid.m_hysteresis)
+          .defaultValue("3")
+          .minimumValue("0")
+          .maximumValue("10");
 
-        param("Consensus -- Parameter Gain", k_param)
-          .defaultValue("0.3")
-          .minimumValue("0.")
-          .maximumValue("1.");
-
-        param("Steady-state Formation Radius", m_r_ss)
+        param("Initial Covariance", m_p0)
+          .minimumValue("0.000001")
+          .defaultValue("1");
+        param("Process Noise", m_params.Q)
+          .minimumValue("0.000001")
+          .defaultValue("0.01");
+        param("Initial Guess Offset x", m_initial_guess_offset.x)
+          .defaultValue("0");
+        param("Initial Guess Offset y", m_initial_guess_offset.y)
+          .defaultValue("0");
+        param("Initial Guess Offset z", m_initial_guess_offset.z)
+          .defaultValue("0");
+        param("Covariance Threshold", m_params.covariance_threshold)
+          .minimumValue("0.01")
+          .defaultValue("1");
+        param("Steady-state Formation Radius", m_params.r_f_steady_state)
           .defaultValue("10");
-        param("Formation Radius Time Constant", m_k_r)
+        param("Formation Radius Time Constant", m_params.k_r_f)
           .defaultValue("0.05");
+        param("Transmission Limit", m_transmission_limit)
+          .defaultValue("2")
+          .minimumValue("1")
+          .maximumValue("10");
+        param("Minimum Delay Between Transmissions", m_transmission_delay)
+          .defaultValue("5")
+          .minimumValue("1");
 
         param("Active", m_active)
           .defaultValue("false");
@@ -151,10 +196,20 @@ namespace NSB
       }
 
       inline void
+      reset_covariance(void)
+      {
+        m_nsb_state.P = m_p0;
+      }
+
+      void
       reset(void)
       {
         is_initialized = false;
         m_last_step.reset();
+        reset_covariance();
+        m_transmission_counter = 0;
+        m_has_obstacle = false;
+        m_last_transmission = 0.;
       }
 
       void
@@ -162,39 +217,79 @@ namespace NSB
       {
         if (paramChanged(m_active))
           reset();
+
+        if (paramChanged(m_obs_avoid.m_cone_min))
+        {
+          m_obs_avoid.m_cone_min = Angles::radians(m_obs_avoid.m_cone_min);
+        }
+        if (paramChanged(m_obs_avoid.m_hysteresis))
+        {
+          m_obs_avoid.m_hysteresis = Angles::radians(m_obs_avoid.m_hysteresis);
+        }
+        if (paramChanged(m_p0))
+        {
+          reset_covariance();
+        }
+      }
+
+      //! Check if the conditions hold, and dispatch an NSB message if necessary
+      inline void
+      dispatch_nsb_message(double P)
+      {
+        double time_now = Clock::get();
+        if ((m_transmission_counter < m_transmission_limit) && ((time_now - m_last_transmission) >= m_transmission_delay) && (P >= m_params.covariance_threshold))
+        {
+          m_transmission_counter++;
+          m_last_transmission = time_now;
+          convert(m_nsb_state, m_nsb_msg);
+          dispatch(m_nsb_msg);
+        }
       }
 
       void
       consume(const IMC::EstimatedState* msg)
       {
+        m_lat0 = msg->lat;
+        m_lon0 = msg->lon;
+        m_current_timestamp = Clock::getSinceEpoch();
+
         if (m_active)
         {
           if (is_initialized)
           {
-            nsb_simulator_step(m_los, m_path, m_r_ss, m_k_r, m_last_step.getDelta(), m_nsb_state);
-            float r_f = std::sqrt(square(m_nsb_state.x-msg->x) + square(m_nsb_state.y-msg->y));
-            if (r_f > m_nsb_state.r_f)
+            m_params.delta_t = m_last_step.getDelta();
+            if (m_has_obstacle)
             {
-              m_nsb_state.r_f = r_f;
+              m_obs_est.simulate(m_current_timestamp);
+              nsb_simulator_step(m_params, m_obs_est.m_obstacle_state, m_nsb_state);
+            }
+            else
+            {
+              nsb_simulator_step(m_params, m_nsb_state);
             }
           }
           else
           {
+            debug("Initializing");
             m_nsb_state.path_param = 0.;
-            m_nsb_state.x = msg->x;
-            m_nsb_state.y = msg->y;
-            m_nsb_state.z = msg->depth;
+            m_nsb_state.p_b.x = msg->x + m_initial_guess_offset.x;
+            m_nsb_state.p_b.y = msg->y + m_initial_guess_offset.y;
+            m_nsb_state.p_b.z = msg->depth + m_initial_guess_offset.z;
             m_nsb_state.r_f = 0.;
             m_last_step.reset();
             is_initialized = true;
           }
+          // Update radius
+          double r = std::sqrt(square(m_nsb_state.p_b.x - msg->x) + square(m_nsb_state.p_b.y - msg->y));
+          if (r > m_nsb_state.r_f)
+            m_nsb_state.r_f = r;
 
-          m_nsb_msg.path_param = m_nsb_state.path_param;
-          m_nsb_msg.x = m_nsb_state.x;
-          m_nsb_msg.y = m_nsb_state.y;
-          m_nsb_msg.z = m_nsb_state.z;
-          m_nsb_msg.r_f = m_nsb_state.r_f;
-          dispatch(m_nsb_msg);
+          // Check if we need to communicate
+          dispatch_nsb_message(m_nsb_state.P);
+
+          // Dispatch NSB state estimate
+          convert(m_nsb_state, m_nsb_est);
+          dispatch(m_nsb_est);
         }
       }
 
@@ -205,13 +300,34 @@ namespace NSB
         {
           debug("Received consensus message from %s", resolveSystemId(msg->getSource()));
 
-          m_nsb_state.path_param = k_param * msg->path_param + (1. - k_param) * m_nsb_state.path_param;
-          m_nsb_state.x = k_position * msg->x + (1. - k_position) * m_nsb_state.x;
-          m_nsb_state.y = k_position * msg->y + (1. - k_position) * m_nsb_state.y;
-          m_nsb_state.z = k_position * msg->z + (1. - k_position) * m_nsb_state.z;
-          if (msg->r_f > m_nsb_state.r_f)
-            m_nsb_state.r_f = msg->r_f;
+          m_transmission_counter = 0;
+
+          convert(msg, m_received_nsb_state);
+          if (msg->getTimeStamp() < m_current_timestamp) // check if we need to forward-simulate the estimate
+          {
+            if (m_has_obstacle)
+            {
+              ObstacleAvoidance obs_avoid_copy(m_obs_avoid); // use a copy of the obstacle avoidance class
+              m_params.oa = &obs_avoid_copy;
+              nsb_simulator_run(m_params, m_obs_est, m_received_nsb_state, msg->getTimeStamp(), m_current_timestamp, 0.1);
+              m_params.oa = &m_obs_avoid;
+            }
+            else
+            {
+              nsb_simulator_run(m_params, m_received_nsb_state, msg->getTimeStamp(), m_current_timestamp, 0.1);
+            }
+          }
+          consensus_algorithm(m_nsb_state, m_received_nsb_state);
+
+          dispatch_nsb_message(m_received_nsb_state.P);
         }
+      }
+
+      void
+      consume(const IMC::Target* msg)
+      {
+        m_obs_est.update(msg, m_lat0, m_lon0);
+        m_has_obstacle = true;
       }
 
       //! Main loop.

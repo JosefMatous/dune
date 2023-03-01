@@ -36,8 +36,6 @@
 #include "../Utilities.hpp"
 #include "../ObstacleAvoidance.hpp"
 #include "../ObstacleEstimator.hpp"
-#include "NSBSimulator.hpp"
-#include "NSBConsensus.hpp"
 
 namespace NSB
 {
@@ -57,25 +55,13 @@ namespace NSB
       Delta m_last_step;
       std::vector<double> m_form_shape;
 
-      ConsensusParameters m_consensus_param;
-
-      // Event-triggered communications
-      int m_transmission_couner;
-      double m_last_transmission;
-
       IMC::DesiredLinearState m_linstate;
-      IMC::NSBMsg m_nsb_msg;
-      IMC::NSBState m_nsb_state;
+      struct 
+      {
+        float path_param, x, y, z, r_f;
+      } m_nsb_state;
+
       IMC::CurvedPathReference m_path_ref;
-
-      NSBStateTimestamp m_current_state;
-      CircularBuffer<NSBStateTimestamp> m_state_log;
-      unsigned int m_state_counter;
-      std::vector<float> m_initial_guess;
-
-      CircularBuffer<IMC::NSBMsg> m_message_buffer;
-      CircularBuffer<bool> m_message_processed;
-      Random::MT19937 m_rng;
 
       // Obstacle avoidance
       ObstacleAvoidance m_obs_avoid;
@@ -96,14 +82,10 @@ namespace NSB
         DUNE::Tasks::Task(name, ctx),
         m_path(0, 0, 0., 50., 30., 0., 0, 0., false, M_PI_2, 0.),
         m_los(15., false, 1.3, 0.5),
-        m_form(0., 0., 0., 0.25, 0.5),
-        m_state_log(1),
-        m_message_buffer(10),
-        m_message_processed(10),
-        m_rng()
+        m_form(0., 0., 0., 0.25, 0.5)
       {
         bind<IMC::EstimatedState>(this);
-        bind<IMC::NSBMsg>(this);
+        bind<IMC::NSBState>(this);
         bind<IMC::Target>(this);
 
         m_linstate.flags = IMC::DesiredLinearState::FL_VX | IMC::DesiredLinearState::FL_VY | IMC::DesiredLinearState::FL_VZ;
@@ -121,12 +103,12 @@ namespace NSB
           .defaultValue("0.")
           .description("Depth of the center of the ellipse");
         param("Ellipse -- Semimajor Axis", m_path.m_a)
-          .defaultValue("50.")
+          .defaultValue("60.")
           .minimumValue("10.")
           .maximumValue("100.")
           .description("Semimajor axis of the ellipse");
         param("Ellipse -- Semiminor Axis", m_path.m_b)
-          .defaultValue("30.")
+          .defaultValue("40.")
           .minimumValue("10.")
           .maximumValue("100.")
           .description("Semiminor axis of the ellipse");
@@ -183,54 +165,6 @@ namespace NSB
           .minimumValue("0.")
           .description("Formation keeping velocity limit");
 
-        param("Consensus -- Position Gain", m_consensus_param.k_position)
-          .defaultValue("0.3")
-          .minimumValue("0.")
-          .maximumValue("1.");
-        param("Consensus -- Parameter Gain", m_consensus_param.k_param)
-          .defaultValue("0.3")
-          .minimumValue("0.")
-          .maximumValue("1.");
-        param("Consensus -- Maximum Communication Period", m_consensus_param.T_max)
-          .defaultValue("80")
-          .minimumValue("5")
-          .maximumValue("1000");
-        param("Consensus -- Minimum Communication Period", m_consensus_param.T_min)
-          .defaultValue("1")
-          .minimumValue("0.05")
-          .maximumValue("10");
-        param("Consensus -- Position Time Constant", m_consensus_param.a_position)
-          .defaultValue("1")
-          .minimumValue("0.")
-          .maximumValue("10.");
-        param("Consensus -- Parameter Time Constant", m_consensus_param.a_param)
-          .defaultValue("50")
-          .minimumValue("0.")
-          .maximumValue("1000.");
-        param("Consensus -- Transmission Limit", m_consensus_param.trans_limit)
-          .defaultValue("2")
-          .minimumValue("1")
-          .maximumValue("10");
-        param("Consensus -- Simulator Step Size", m_consensus_param.delta_t)
-          .defaultValue("0.1")
-          .minimumValue("0.")
-          .maximumValue("1.");
-        param("Consensus -- Buffer Capacity", m_consensus_param.buffer_size)
-          .defaultValue("30")
-          .minimumValue("1")
-          .maximumValue("100");
-        param("Consensus -- Buffer Decimation", m_consensus_param.decimation)
-          .defaultValue("30")
-          .minimumValue("1")
-          .maximumValue("100");
-        param("Consensus -- Artificial Delay", m_consensus_param.delay)
-          .defaultValue("10")
-          .minimumValue("0");
-        param("Consensus -- Artificial Packet Loss", m_consensus_param.packet_loss)
-          .defaultValue("0.1")
-          .minimumValue("0")
-          .maximumValue("1");
-
         param("Obstacle Avoidance -- Minimum Cone Angle", m_obs_avoid.m_cone_min)
           .defaultValue("5")
           .minimumValue("1")
@@ -243,11 +177,6 @@ namespace NSB
           .defaultValue("3")
           .minimumValue("0")
           .maximumValue("10");
-
-        param("Steady-state Formation Radius", m_consensus_param.r_ss)
-          .defaultValue("10");
-        param("Formation Radius Time Constant", m_consensus_param.k_r)
-          .defaultValue("0.05");
 
         param("Active", m_active)
           .defaultValue("false");
@@ -297,15 +226,6 @@ namespace NSB
           m_form.p_form.y = m_form_shape[1];
           m_form.p_form.z = m_form_shape[2];
         }
-        if (m_consensus_param.T_min > m_consensus_param.T_max)
-        {
-          war("Minimum communications period is greater than maximum communications period");
-          m_consensus_param.T_min = m_consensus_param.T_max;
-        }
-        if (paramChanged(m_consensus_param.buffer_size))
-        {
-          m_state_log.setCapacity(m_consensus_param.buffer_size);
-        }
         if (paramChanged(m_obs_avoid.m_cone_min))
         {
           m_obs_avoid.m_cone_min = Angles::radians(m_obs_avoid.m_cone_min);
@@ -325,57 +245,23 @@ namespace NSB
       }
 
       void
-      onResourceRelease(void)
-      {
-        //m_state_log.~CircularBuffer(); // this is done automatically
-      }
-
-      void
       reset(void)
       {
         m_T_start = -1.;
         is_initialized = false;
-        m_consensus_param.comm_period = m_consensus_param.T_min;
-        m_transmission_couner = 0;
-        m_state_log.clear();
-        m_state_counter = m_consensus_param.decimation;
         m_has_obstacle = false;
       }
 
-      inline void
-      processNSBMsg(const IMC::NSBMsg& msg)
-      {
-        //if (isActive() && is_initialized && (msg.getSource() != getSystemId()))
-        //{
-          debug("Received consensus message from %s", resolveSystemId(msg.getSource()));
-
-          NSBStateTimestamp s_recv;
-          convert(msg, s_recv);
-
-          debug("Received timestamp: %.2f, Current timestamp: %.2f", s_recv.timestamp, m_current_state.timestamp);
-
-          nsb_consensus_update(s_recv, m_current_state, m_state_log, m_obs_avoid, m_obs_est, m_los, m_path, m_consensus_param);       
-
-          debug("Communications period set to %.1f seconds", m_consensus_param.comm_period);
-          m_transmission_couner = 0;
-        //}
-      }
-
       void
-      consume(const IMC::NSBMsg* msg)
+      consume(const IMC::NSBState* msg)
       {
-        if (isActive() && is_initialized && (msg->getSource() != getSystemId()))
-        {
-          if (m_rng.uniform() >= m_consensus_param.packet_loss)
-          {
-            m_message_buffer.add(*msg);
-            m_message_processed.add(false);
-          }
-          else
-          {
-            debug("Packet dropped");
-          }
-        }
+        m_nsb_state.path_param = msg->path_param;
+        m_nsb_state.x = msg->x;
+        m_nsb_state.y = msg->y;
+        m_nsb_state.z = msg->z;
+        m_nsb_state.r_f = msg->r_f;
+
+        is_initialized = true;
       }
 
       void
@@ -384,21 +270,6 @@ namespace NSB
         m_obs_est.update(msg, m_lat0, m_lon0);
         m_obs_est.simulate(Clock::getSinceEpoch());
         m_has_obstacle = true;
-        //debug("Obstacle at x=%.1f, y=%.2f", m_obs_est.m_obstacle_state.x, m_obs_est.m_obstacle_state.y);
-      }
-
-      inline void
-      consensusCheck(void)
-      {
-        for (unsigned i = 0; i < m_message_buffer.getSize(); i++)
-        {
-          if (!m_message_processed(i) && (m_current_state.timestamp >= m_message_buffer(i).getTimeStamp() + m_consensus_param.delay))
-          {
-            processNSBMsg(m_message_buffer(i));
-            m_message_processed(i) = true;
-            return;
-          }
-        }        
       }
 
       void
@@ -406,72 +277,15 @@ namespace NSB
       {
         m_lat0 = msg->lat;
         m_lon0 = msg->lon;
-        if (isActive())
+        if (isActive() && is_initialized)
         {
-          double delta_t;
-          double time_now = Clock::get();          
-          if (!is_initialized)
-          {
-            // initialized the NSB estimate
-            m_current_state.nsb_state.path_param = 0.;
-            /* ad hoc solution -- we know that the initial path heading is pi/2 */
-            m_current_state.nsb_state.x = msg->x + m_form.p_form.x;
-            m_current_state.nsb_state.y = msg->y - m_form.p_form.y;
-            m_current_state.nsb_state.z = msg->depth - m_form.p_form.z;
-            m_current_state.nsb_state.r_f = 0.;
-
-            m_last_step.reset();
-            m_T_start = time_now;
-            delta_t = 0.05;
-            m_last_transmission = time_now;
-
-            is_initialized = true;
-          }
-          else
-          {
-            delta_t = m_last_step.getDelta();
-          }
-          m_current_state.timestamp = Clock::getSinceEpoch();
-          consensusCheck();
-
-          // update estimate of formation radius
-          float r_f = std::sqrt(square(msg->x - m_current_state.nsb_state.x) + square(msg->y - m_current_state.nsb_state.y));
-          if (r_f > m_current_state.nsb_state.r_f)
-            m_current_state.nsb_state.r_f = r_f;
-
-          if (m_has_obstacle)
-          {
-            m_obs_est.simulate(m_current_state.timestamp);
-          }
-
           GeometricPath::PathReference path_ref;
-          m_path.getPathReference(m_current_state.nsb_state.path_param, path_ref);
+          m_path.getPathReference(m_nsb_state.path_param, path_ref);
 
           //debug("Vehicle at x = %.2f, y = %.2f", msg->x, msg->y);
 
-          // Log NSB state
-          if (++m_state_counter >= m_consensus_param.decimation)
-          {
-            m_state_log.add(m_current_state);
-            m_state_counter = 0;
-          }
-
-          // Dispatch NSB state
-          convert(m_current_state, m_nsb_state);
-          dispatch(m_nsb_state);
-
-          // Dispatch NSB message
-          if ((time_now - m_last_transmission >= m_consensus_param.comm_period) && (m_transmission_couner < m_consensus_param.trans_limit))
-          {
-            convert(m_current_state, m_nsb_msg);
-            dispatch(m_nsb_msg);
-
-            m_last_transmission = time_now;
-            m_transmission_couner++;
-          }
-
           // Dispatch path reference
-          m_path_ref.param = m_current_state.nsb_state.path_param;
+          m_path_ref.param = m_nsb_state.path_param;
           m_path_ref.lat = msg->lat;
           m_path_ref.lon = msg->lon;
           WGS84::displace(path_ref.x, path_ref.y, &m_path_ref.lat, &m_path_ref.lon);
@@ -484,7 +298,7 @@ namespace NSB
           //debug("Path parameter %.3f", m_current_state.nsb_state.path_param);
 
           Vector3D path_err;
-          GeometricPath::getPathFollowingError(path_ref, m_current_state.nsb_state.x, m_current_state.nsb_state.y, m_current_state.nsb_state.z, path_err);
+          GeometricPath::getPathFollowingError(path_ref, m_nsb_state.x, m_nsb_state.y, m_nsb_state.z, path_err);
           LineOfSight::LineOfSightOutput los_out;
           m_los.step(path_ref, path_err, los_out);
 
@@ -493,15 +307,15 @@ namespace NSB
 
           if (m_has_obstacle)
           {
-            m_obs_avoid.step(m_current_state.nsb_state.x, m_current_state.nsb_state.y, 
-                            m_obs_est.m_obstacle_state, m_current_state.nsb_state.r_f, los_out);
+            m_obs_avoid.step(m_nsb_state.x, m_nsb_state.y, 
+                            m_obs_est.m_obstacle_state, m_nsb_state.r_f, los_out);
             //debug("LOS vector after OA: x = %.2f, y = %.2f, z = %.2f", los_out.velocity.x, los_out.velocity.y, los_out.velocity.z);
           }
 
           Vector3D sigma;
-          sigma.x = msg->x - m_current_state.nsb_state.x;
-          sigma.y = msg->y - m_current_state.nsb_state.y;
-          sigma.z = msg->depth - m_current_state.nsb_state.z;
+          sigma.x = msg->x - m_nsb_state.x;
+          sigma.y = msg->y - m_nsb_state.y;
+          sigma.z = msg->depth - m_nsb_state.z;
           Vector3D form_velocity;
           m_form.step(path_ref, sigma, los_out.path_parameter_derivative, form_velocity);
 
@@ -512,8 +326,6 @@ namespace NSB
           m_linstate.vy = los_out.velocity.y + form_velocity.y;
           m_linstate.vz = los_out.velocity.z + form_velocity.z;
           dispatch(m_linstate);
-
-          nsb_simulator_step(los_out, m_consensus_param.r_ss, m_consensus_param.k_r, delta_t, m_current_state.nsb_state);
 
           if (m_T_stop > 0.) // check for time-based termination
           {
@@ -528,7 +340,7 @@ namespace NSB
           }
           if (m_param_stop > 0.) // check for parameter-based termination
           {
-            if ((m_current_state.nsb_state.path_param > m_param_stop))
+            if ((m_nsb_state.path_param > m_param_stop))
             {
               debug("Reached experiment termination parameter.");
               m_active = false;

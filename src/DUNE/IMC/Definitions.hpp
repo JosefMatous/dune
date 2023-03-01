@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: a9b25b801ed53322c5c666ae717ee492                            *
+// IMC XML MD5: de3f20d1a93e93aefc1cee7375f1fb92                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_DEFINITIONS_HPP_INCLUDED_
@@ -26648,6 +26648,8 @@ namespace DUNE
       fp32_t z;
       //! Formation Radius.
       fp32_t r_f;
+      //! Covariance.
+      fp32_t p;
 
       static uint16_t
       getIdStatic(void)
@@ -26696,7 +26698,7 @@ namespace DUNE
       unsigned
       getFixedSerializationSize(void) const
       {
-        return 20;
+        return 24;
       }
 
       void
@@ -26717,6 +26719,8 @@ namespace DUNE
       fp32_t z;
       //! Formation Radius.
       fp32_t r_f;
+      //! Covariance.
+      fp32_t p;
 
       static uint16_t
       getIdStatic(void)
@@ -26765,7 +26769,7 @@ namespace DUNE
       unsigned
       getFixedSerializationSize(void) const
       {
-        return 20;
+        return 24;
       }
 
       void

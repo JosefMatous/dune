@@ -85,15 +85,15 @@ namespace NSB
         }    
 
         //! Performs the obstacle avoidance algorithm.
-        //! The new desired velocity vector is written into the LOS output.
+        //! The new desired velocity vector is written into own velocities.
         inline void
-        step(float own_x, float own_y, ObstacleState& obs, float extra_avoidance_radius, LineOfSight::LineOfSightOutput& out)
+        step(float own_x, float own_y, ObstacleState& obs, float extra_avoidance_radius, double& own_vx, double& own_vy)
         {
           Vector2D relative_position, relative_velocity;
           relative_position.x = obs.x - own_x;
           relative_position.y = obs.y - own_y;
-          relative_velocity.x = out.velocity.x - obs.vx;
-          relative_velocity.y = out.velocity.y - obs.vy;
+          relative_velocity.x = own_vx - obs.vx;
+          relative_velocity.y = own_vy - obs.vy;
 
           double distance = norm(relative_position);
           double cone_angle;
@@ -132,8 +132,14 @@ namespace NSB
           }
 
           double desired_course = std::atan2(relative_position.y, relative_position.x) + m_last_direction*cone_angle;
-          out.velocity.x = speed*std::cos(desired_course) + obs.vx;
-          out.velocity.y = speed*std::sin(desired_course) + obs.vy;
+          own_vx = speed*std::cos(desired_course) + obs.vx;
+          own_vy = speed*std::sin(desired_course) + obs.vy;
+        }
+
+        inline void
+        step(float own_x, float own_y, ObstacleState& obs, float extra_avoidance_radius, LineOfSight::LineOfSightOutput& out)
+        {
+          step(own_x, own_y, obs, extra_avoidance_radius, out.velocity.x, out.velocity.y);
         }
     };    
 }

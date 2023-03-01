@@ -86,6 +86,13 @@ namespace NSB
       }
 
       void
+      onUpdateParameters(void)
+      {
+        if (paramChanged(m_active))
+          reset();
+      }
+
+      void
       onResourceInitialization(void)
       {
         reset();
