@@ -72,6 +72,11 @@ namespace NSB
 
       double m_current_timestamp;
 
+      double m_delay, m_loss;
+      CircularBuffer<IMC::NSBMsg> m_msg_buffer;
+      CircularBuffer<bool> m_msg_processed;
+      Math::Random::MT19937 m_rng;
+
       bool is_initialized, m_active, m_has_obstacle;
 
       //! Constructor.
@@ -80,7 +85,9 @@ namespace NSB
       Task(const std::string& name, Tasks::Context& ctx):
         DUNE::Tasks::Task(name, ctx),
         m_path(0, 0, 0., 50., 30., 0., 0., 0., false, M_PI_2, 0.),
-        m_los(15., false, 1.3, 0.5)
+        m_los(15., false, 1.3, 0.5),
+        m_msg_buffer(8),
+        m_msg_processed(8)
       {
         bind<IMC::EstimatedState>(this);
         bind<IMC::NSBMsg>(this);
@@ -189,6 +196,11 @@ namespace NSB
           .defaultValue("5")
           .minimumValue("1");
 
+        param("Artificial Delay", m_delay)
+          .defaultValue("0");
+        param("Artificial Packet Loss", m_loss)
+          .defaultValue("0");
+
         param("Active", m_active)
           .defaultValue("false");
 
@@ -210,6 +222,9 @@ namespace NSB
         m_transmission_counter = 0;
         m_has_obstacle = false;
         m_last_transmission = 0.;
+
+        m_msg_buffer.clear();
+        m_msg_processed.clear();
       }
 
       void
@@ -284,6 +299,10 @@ namespace NSB
           if (r > m_nsb_state.r_f)
             m_nsb_state.r_f = r;
 
+          // Process the NSB messages here if there is artificial delay
+          if (m_delay > 0.)
+            process_msg_buffer();
+
           // Check if we need to communicate
           dispatch_nsb_message(m_nsb_state.P);
 
@@ -293,33 +312,68 @@ namespace NSB
         }
       }
 
+      inline void
+      process_nsb_message(const IMC::NSBMsg& msg)
+      {
+        if (m_active && is_initialized && (msg.getSource() != getSystemId()))
+        {
+          if (m_rng.uniform() > m_loss)
+          {
+            debug("Received consensus message from %s", resolveSystemId(msg.getSource()));
+
+            m_transmission_counter = 0;
+
+            convert(msg, m_received_nsb_state);
+            if (msg.getTimeStamp() < m_current_timestamp) // check if we need to forward-simulate the estimate
+            {
+              if (m_has_obstacle)
+              {
+                ObstacleAvoidance obs_avoid_copy(m_obs_avoid); // use a copy of the obstacle avoidance class
+                m_params.oa = &obs_avoid_copy;
+                nsb_simulator_run(m_params, m_obs_est, m_received_nsb_state, msg.getTimeStamp(), m_current_timestamp, 0.1);
+                m_params.oa = &m_obs_avoid;
+              }
+              else
+              {
+                nsb_simulator_run(m_params, m_received_nsb_state, msg.getTimeStamp(), m_current_timestamp, 0.1);
+              }
+            }
+            consensus_algorithm(m_nsb_state, m_received_nsb_state);
+
+            dispatch_nsb_message(m_received_nsb_state.P);
+          }
+          else
+          {
+            debug("Message dropped");
+          }
+        }
+      }
+
+      inline void
+      process_msg_buffer(void)
+      {
+        for (unsigned i = 0; i < m_msg_buffer.getSize(); i++)
+        {
+          if (!m_msg_processed(i) && (m_current_timestamp - m_msg_buffer(i).getTimeStamp() >= m_delay))
+          {
+            process_nsb_message(m_msg_buffer(i));
+            m_msg_processed(i) = true;
+          }
+        }
+        
+      }
+
       void
       consume(const IMC::NSBMsg* msg)
       {
-        if (m_active && is_initialized && (msg->getSource() != getSystemId()))
+        if (m_delay <= 0.)
         {
-          debug("Received consensus message from %s", resolveSystemId(msg->getSource()));
-
-          m_transmission_counter = 0;
-
-          convert(msg, m_received_nsb_state);
-          if (msg->getTimeStamp() < m_current_timestamp) // check if we need to forward-simulate the estimate
-          {
-            if (m_has_obstacle)
-            {
-              ObstacleAvoidance obs_avoid_copy(m_obs_avoid); // use a copy of the obstacle avoidance class
-              m_params.oa = &obs_avoid_copy;
-              nsb_simulator_run(m_params, m_obs_est, m_received_nsb_state, msg->getTimeStamp(), m_current_timestamp, 0.1);
-              m_params.oa = &m_obs_avoid;
-            }
-            else
-            {
-              nsb_simulator_run(m_params, m_received_nsb_state, msg->getTimeStamp(), m_current_timestamp, 0.1);
-            }
-          }
-          consensus_algorithm(m_nsb_state, m_received_nsb_state);
-
-          dispatch_nsb_message(m_received_nsb_state.P);
+          process_nsb_message(*msg);
+        }
+        else
+        {
+          m_msg_buffer.add(*msg);
+          m_msg_processed.add(false);
         }
       }
 

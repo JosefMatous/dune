@@ -54,6 +54,17 @@ namespace NSB
     }
 
     inline void
+    convert(const IMC::NSBMsg& src, StateEstimate& dest)
+    {
+      dest.p_b.x = src.x;
+      dest.p_b.y = src.y;
+      dest.p_b.z = src.z;
+      dest.path_param = src.path_param;
+      dest.r_f = src.r_f;
+      dest.P = src.p;
+    }
+
+    inline void
     convert(StateEstimate& src, IMC::NSBMsg& dest)
     {
       dest.x = src.p_b.x;
