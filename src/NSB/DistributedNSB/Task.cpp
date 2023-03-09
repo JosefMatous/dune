@@ -105,17 +105,17 @@ namespace NSB
         param("Ellipse -- Semimajor Axis", m_path.m_a)
           .defaultValue("60.")
           .minimumValue("10.")
-          .maximumValue("100.")
+          .maximumValue("1000.")
           .description("Semimajor axis of the ellipse");
         param("Ellipse -- Semiminor Axis", m_path.m_b)
           .defaultValue("40.")
           .minimumValue("10.")
-          .maximumValue("100.")
+          .maximumValue("1000.")
           .description("Semiminor axis of the ellipse");
         param("Ellipse -- Z Amplitude", m_path.m_c)
           .defaultValue("0.")
           .minimumValue("0.")
-          .maximumValue("10.")
+          .maximumValue("100.")
           .description("Amplitude of oscillations in the z-axis");
         param("Ellipse -- Clockwise", m_path.m_clockwise)
           .defaultValue("true")

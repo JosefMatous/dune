@@ -34,6 +34,7 @@
 #include "../LineOfSight.hpp"
 #include "../ObstacleAvoidance.hpp"
 #include "../ObstacleEstimator.hpp"
+#include "../FormationKeeping.hpp"
 #include "../Utilities.hpp"
 #include "NSBSimulator.hpp"
 #include "NSBConsensus.hpp"
@@ -55,11 +56,10 @@ namespace NSB
       LineOfSight m_los;
       ObstacleAvoidance m_obs_avoid;
       ObstacleEstimator m_obs_est;
+      FormationKeepingSaturated m_form;
       EstimatorParameters m_params;
-      Delta m_last_step;
-
-      double m_p0;
-      Vector3D m_initial_guess_offset;
+      Delta m_last_step, m_last_linstate;
+      std::vector<double> m_form_shape;
 
       IMC::NSBMsg m_nsb_msg;   // consensus message (sent to others)
       IMC::NSBState m_nsb_est; // state message (sent to self)
@@ -68,9 +68,12 @@ namespace NSB
       double m_lat0, m_lon0;
 
       int m_transmission_limit, m_transmission_counter;
-      double m_transmission_delay, m_last_transmission;
+
+      int m_linstate_counter;
+      Vector3D m_p_hat;
 
       double m_current_timestamp;
+      double m_next_transmission, m_next_period;
 
       double m_delay, m_loss;
       CircularBuffer<IMC::NSBMsg> m_msg_buffer;
@@ -86,10 +89,12 @@ namespace NSB
         DUNE::Tasks::Task(name, ctx),
         m_path(0, 0, 0., 50., 30., 0., 0., 0., false, M_PI_2, 0.),
         m_los(15., false, 1.3, 0.5),
+        m_form(0., 0., 0., 0.25, 0.5),
         m_msg_buffer(8),
         m_msg_processed(8)
       {
         bind<IMC::EstimatedState>(this);
+        bind<IMC::DesiredLinearState>(this);
         bind<IMC::NSBMsg>(this);
         bind<IMC::Target>(this);
 
@@ -109,17 +114,17 @@ namespace NSB
         param("Ellipse -- Semimajor Axis", m_path.m_a)
           .defaultValue("60.")
           .minimumValue("10.")
-          .maximumValue("100.")
+          .maximumValue("1000.")
           .description("Semimajor axis of the ellipse");
         param("Ellipse -- Semiminor Axis", m_path.m_b)
           .defaultValue("40.")
           .minimumValue("10.")
-          .maximumValue("100.")
+          .maximumValue("1000.")
           .description("Semiminor axis of the ellipse");
         param("Ellipse -- Z Amplitude", m_path.m_c)
           .defaultValue("0.")
           .minimumValue("0.")
-          .maximumValue("10.")
+          .maximumValue("100.")
           .description("Amplitude of oscillations in the z-axis");
         param("Ellipse -- Clockwise", m_path.m_clockwise)
           .defaultValue("true")
@@ -156,6 +161,11 @@ namespace NSB
           .maximumValue("2.")
           .description("Path parameter update gain");
 
+        param("Formation Keeping -- Shape", m_form_shape)
+          .defaultValue("0., 0., 0.")
+          .size(3)
+          .description("Position of the vehicle within the formation");
+
         param("Obstacle Avoidance -- Minimum Cone Angle", m_obs_avoid.m_cone_min)
           .defaultValue("5")
           .minimumValue("1")
@@ -169,32 +179,35 @@ namespace NSB
           .minimumValue("0")
           .maximumValue("10");
 
-        param("Initial Covariance", m_p0)
+        param("Initial Covariance", m_params.P0)
           .minimumValue("0.000001")
           .defaultValue("1");
         param("Process Noise", m_params.Q)
           .minimumValue("0.000001")
           .defaultValue("0.01");
-        param("Initial Guess Offset x", m_initial_guess_offset.x)
-          .defaultValue("0");
-        param("Initial Guess Offset y", m_initial_guess_offset.y)
-          .defaultValue("0");
-        param("Initial Guess Offset z", m_initial_guess_offset.z)
-          .defaultValue("0");
-        param("Covariance Threshold", m_params.covariance_threshold)
-          .minimumValue("0.01")
-          .defaultValue("1");
         param("Steady-state Formation Radius", m_params.r_f_steady_state)
           .defaultValue("10");
         param("Formation Radius Time Constant", m_params.k_r_f)
           .defaultValue("0.05");
-        param("Transmission Limit", m_transmission_limit)
-          .defaultValue("2")
-          .minimumValue("1")
-          .maximumValue("10");
-        param("Minimum Delay Between Transmissions", m_transmission_delay)
+        param("Minimum Comm Period", m_params.T_min)
           .defaultValue("5")
           .minimumValue("1");
+        param("Maximum Comm Period", m_params.T_max)
+          .defaultValue("90")
+          .minimumValue("10");
+        param("Maximum Number of Consecutive Transmissions", m_transmission_limit)
+          .defaultValue("2");
+        param("Position Update -- Gain", m_params.k_self)
+          .defaultValue("0.2");
+        param("Position Update -- Decimation", m_params.n_self)
+          .defaultValue("20")
+          .minimumValue("1");
+        param("Event Trigger -- Parameter Penalty", m_params.a_s)
+          .defaultValue("100")
+          .minimumValue("0.01");
+        param("Event Trigger -- Position Penalty", m_params.a_p)
+          .defaultValue("1")
+          .minimumValue("0.01");
 
         param("Artificial Delay", m_delay)
           .defaultValue("0");
@@ -207,21 +220,17 @@ namespace NSB
         reset();
       }
 
-      inline void
-      reset_covariance(void)
-      {
-        m_nsb_state.P = m_p0;
-      }
-
       void
       reset(void)
       {
         is_initialized = false;
         m_last_step.reset();
-        reset_covariance();
+        m_last_linstate.reset();
         m_transmission_counter = 0;
+        m_linstate_counter = 0;
         m_has_obstacle = false;
-        m_last_transmission = 0.;
+        m_next_transmission = 0.;
+        m_next_period = m_params.T_min;
 
         m_msg_buffer.clear();
         m_msg_processed.clear();
@@ -241,24 +250,36 @@ namespace NSB
         {
           m_obs_avoid.m_hysteresis = Angles::radians(m_obs_avoid.m_hysteresis);
         }
-        if (paramChanged(m_p0))
+        if (paramChanged(m_form_shape))
         {
-          reset_covariance();
+          m_params.p_form.x = m_form_shape[0];
+          m_params.p_form.y = m_form_shape[1];
+          m_params.p_form.z = m_form_shape[2];
         }
       }
 
       //! Check if the conditions hold, and dispatch an NSB message if necessary
       inline void
-      dispatch_nsb_message(double P)
+      dispatch_nsb_message(void)
       {
         double time_now = Clock::get();
-        if ((m_transmission_counter < m_transmission_limit) && ((time_now - m_last_transmission) >= m_transmission_delay) && (P >= m_params.covariance_threshold))
+        if ((m_transmission_counter < m_transmission_limit) && (time_now >= m_next_transmission))
         {
           m_transmission_counter++;
-          m_last_transmission = time_now;
+          m_next_transmission = time_now + m_next_period;
           convert(m_nsb_state, m_nsb_msg);
           dispatch(m_nsb_msg);
         }
+      }
+
+      inline void
+      reset_position_estimate(const IMC::EstimatedState* msg)
+      {
+        m_p_hat.x = msg->x;
+        m_p_hat.y = msg->y;
+        m_p_hat.z = msg->depth;
+        m_last_linstate.reset();
+        m_linstate_counter = 0;
       }
 
       void
@@ -286,11 +307,8 @@ namespace NSB
           else
           {
             debug("Initializing");
-            m_nsb_state.path_param = 0.;
-            m_nsb_state.p_b.x = msg->x + m_initial_guess_offset.x;
-            m_nsb_state.p_b.y = msg->y + m_initial_guess_offset.y;
-            m_nsb_state.p_b.z = msg->depth + m_initial_guess_offset.z;
-            m_nsb_state.r_f = 0.;
+            initial_guess(m_nsb_state, m_params, msg);
+            reset_position_estimate(msg);
             m_last_step.reset();
             is_initialized = true;
           }
@@ -299,12 +317,19 @@ namespace NSB
           if (r > m_nsb_state.r_f)
             m_nsb_state.r_f = r;
 
+          // Self-update
+          if (m_linstate_counter >= m_params.n_self)
+          {
+            self_update(m_nsb_state, m_params, msg, m_p_hat);
+            reset_position_estimate(msg);
+          }
+
           // Process the NSB messages here if there is artificial delay
           if (m_delay > 0.)
             process_msg_buffer();
 
           // Check if we need to communicate
-          dispatch_nsb_message(m_nsb_state.P);
+          dispatch_nsb_message();
 
           // Dispatch NSB state estimate
           convert(m_nsb_state, m_nsb_est);
@@ -338,9 +363,9 @@ namespace NSB
                 nsb_simulator_run(m_params, m_received_nsb_state, msg.getTimeStamp(), m_current_timestamp, 0.1);
               }
             }
+            m_next_period = update_comm_period(m_nsb_state, m_received_nsb_state, m_params);
+            debug("Comm period set to %.1f seconds", m_next_period);
             consensus_algorithm(m_nsb_state, m_received_nsb_state);
-
-            dispatch_nsb_message(m_received_nsb_state.P);
           }
           else
           {
@@ -382,6 +407,19 @@ namespace NSB
       {
         m_obs_est.update(msg, m_lat0, m_lon0);
         m_has_obstacle = true;
+      }
+
+      void
+      consume(const IMC::DesiredLinearState* msg)
+      {
+        if (is_initialized)
+        {
+          double delta_t = m_last_linstate.getDelta();
+          m_p_hat.x += msg->vx * delta_t;
+          m_p_hat.y += msg->vy * delta_t;
+          m_p_hat.z += msg->vz * delta_t;
+          m_linstate_counter++;
+        }
       }
 
       //! Main loop.

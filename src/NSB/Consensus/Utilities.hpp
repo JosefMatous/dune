@@ -38,8 +38,15 @@ namespace NSB
       double r_f_steady_state;
       double k_r_f;
       double delta_t;
-      double covariance_threshold;
+      double k_self;
+      int n_self;
+      double a_s;
+      double a_p;
+      double T_min;
+      double T_max;
       double Q;
+      Vector3D p_form;
+      double P0;
     };
 
     inline void
@@ -84,6 +91,25 @@ namespace NSB
       dest.path_param = src.path_param;
       dest.r_f = src.r_f;
       dest.p = src.P;
+    }
+
+    //! Mutltiplies a given vector by a path rotation matrix
+    inline void
+    mult_path_rotation_matrix(const GeometricPath::PathReference& path_ref, const Vector3D& x, Vector3D& result)
+    {
+      double c_theta = std::cos(path_ref.theta);
+      double s_theta = std::sin(path_ref.theta);
+      double c_psi = std::cos(path_ref.psi);
+      double s_psi = std::sin(path_ref.psi);
+
+      /*double R[3][3] = {{c_psi*c_theta, -s_psi, c_psi*s_theta},
+                        {c_theta*s_psi,  c_psi, s_psi*s_theta},
+                        {     -s_theta,      0,       c_theta}};*/
+
+      // Calculate the desired values of sigma
+      result.x = c_psi*c_theta*x.x - s_psi*x.y + c_psi*s_theta*x.z;
+      result.y = s_psi*c_theta*x.x + c_psi*x.y + s_psi*s_theta*x.z;
+      result.z = -s_theta*x.x + c_theta*x.z;
     }
   }
 }
