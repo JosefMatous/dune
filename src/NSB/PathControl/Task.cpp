@@ -30,6 +30,7 @@
 // DUNE headers.
 #include <DUNE/DUNE.hpp>
 
+#include "CollisionEllipse.hpp"
 #include "../Utilities.hpp"
 
 namespace NSB
@@ -59,6 +60,22 @@ namespace NSB
         float u_min; // minimum commanded speed
       } m_params;
 
+      struct 
+      {
+        //! Use monitor
+        bool use;
+        //! Collision ellipse origin.
+        std::vector<float> x0, y0;
+        //! Collision ellipse orientation.
+        std::vector<float> angle;
+        //! Collision ellipse axes.
+        std::vector<float> a, b;
+        //! True if the vehicle should remain inside the collision ellipse.
+        std::vector<bool> inside;
+        //! True if the operation limits are an intersection of ellipses, false for union
+        bool intersection;
+      } m_monitor_params;
+
       DiscretePID m_horizontal_pid;
       float m_vertical_integrator;
       float m_last_z;
@@ -69,6 +86,8 @@ namespace NSB
       } m_desired_velocity;
       
       bool m_active; // External activation
+
+      std::vector<CollisionEllipse<float>> m_ellipses;
 
       IMC::DesiredHeading m_yaw;
       IMC::DesiredPitch m_pitch;
@@ -103,6 +122,23 @@ namespace NSB
         param("Active", m_active)
           .defaultValue("false");
 
+        param("Collision Ellipse -- Monitor", m_monitor_params.use)
+          .defaultValue("false");
+        param("Collision Ellipse -- Semimajor axes", m_monitor_params.a)
+          .defaultValue("50");
+        param("Collision Ellipse -- Semiminor axes", m_monitor_params.b)
+          .defaultValue("30");
+        param("Collision Ellipse -- Orientations", m_monitor_params.angle)
+          .defaultValue("0");
+        param("Collision Ellipse -- Origin x", m_monitor_params.x0)
+          .defaultValue("0");
+        param("Collision Ellipse -- Origin y", m_monitor_params.y0)
+          .defaultValue("0");
+        param("Collision Ellipse -- Inside", m_monitor_params.inside)
+          .defaultValue("true");   
+        param("Collision Ellipse -- Intersection", m_monitor_params.intersection)
+          .defaultValue("true");   
+
         m_speed.speed_units = IMC::SUNITS_METERS_PS;
 
         reset();
@@ -133,6 +169,23 @@ namespace NSB
           m_params.theta_max = Angles::radians(m_params.theta_max);
         if (paramChanged(m_params.vertical_ff_offset))
           m_params.vertical_ff_offset = Angles::radians(m_params.vertical_ff_offset);
+
+        if (paramChanged(m_monitor_params.a) || paramChanged(m_monitor_params.b) || paramChanged(m_monitor_params.angle) || paramChanged(m_monitor_params.x0) || paramChanged(m_monitor_params.y0))
+        {
+          size_t n_ellipses = m_monitor_params.a.size();
+          if ((m_monitor_params.b.size() != n_ellipses) || (m_monitor_params.angle.size() != n_ellipses) || (m_monitor_params.x0.size() != n_ellipses) || (m_monitor_params.y0.size() != n_ellipses))
+          {
+            war("Incompatible size of parameter vectors");
+            return;
+          }
+          if (m_ellipses.size() != n_ellipses)
+            m_ellipses.resize(n_ellipses);
+
+          for (size_t i = 0; i < n_ellipses; i++)
+          {
+            m_ellipses[i] = CollisionEllipse<float>(m_monitor_params.a[i], m_monitor_params.b[i], m_monitor_params.angle[i], m_monitor_params.x0[i], m_monitor_params.y0[i]);
+          }          
+        }
       }
 
       void
@@ -211,6 +264,29 @@ namespace NSB
         }
       }
 
+      inline void
+      collision_ellipse_monitor(const IMC::EstimatedState& state)
+      {
+        bool is_in_limits;
+        if (m_monitor_params.intersection)
+        {
+          is_in_limits = true;
+          for (size_t i = 0; i < m_ellipses.size(); i++)
+            is_in_limits &= (m_monitor_params.inside[i]) ? m_ellipses[i].isInside(state.x, state.y) : m_ellipses[i].isOutside(state.x, state.y);
+        }
+        else
+        {
+          is_in_limits = false;
+          for (size_t i = 0; i < m_ellipses.size(); i++)
+            is_in_limits |= (m_monitor_params.inside[i]) ? m_ellipses[i].isInside(state.x, state.y) : m_ellipses[i].isOutside(state.x, state.y);
+        }
+
+        if (!is_in_limits)
+        {
+          signalError(DTR("Vehicle outside of operating limits"));
+        }
+      }
+
       void
       step(const IMC::EstimatedState& state, const TrackingState& ts)
       {
@@ -257,6 +333,10 @@ namespace NSB
             m_speed.value = m_params.u_min;
           }
           dispatch(m_speed);
+
+          // Monitor
+          if (m_monitor_params.use)
+            collision_ellipse_monitor(state);
         }
       }
     };    

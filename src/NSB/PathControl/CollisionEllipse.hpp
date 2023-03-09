@@ -37,7 +37,7 @@
 
 namespace NSB
 {
-  namespace Monitor
+  namespace PathControl
   {
     using DUNE_NAMESPACES;
 
