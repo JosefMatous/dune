@@ -11,13 +11,13 @@ else
 fi
 
 # Simulator 1
-$DUNE_SENDMSG localhost 6002 PlanControl 0 "${PREFIX}1"
+$DUNE_SENDMSG localhost 6002 PlanControl 0 "${PREFIX}1_start"
 
 # Simulator 2
-$DUNE_SENDMSG localhost 6003 PlanControl 0 "${PREFIX}2"
+$DUNE_SENDMSG localhost 6003 PlanControl 0 "${PREFIX}2_start"
 
 # Simulator 3
-$DUNE_SENDMSG localhost 6004 PlanControl 0 "${PREFIX}3"
+$DUNE_SENDMSG localhost 6004 PlanControl 0 "${PREFIX}3_start"
 
 # Simulator 4
-$DUNE_SENDMSG localhost 6005 PlanControl 0 "${PREFIX}4"
+$DUNE_SENDMSG localhost 6005 PlanControl 0 "${PREFIX}4_start"
