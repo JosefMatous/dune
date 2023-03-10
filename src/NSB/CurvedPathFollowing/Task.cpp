@@ -32,6 +32,8 @@
 
 #include "../GeometricPath.hpp"
 #include "../LineOfSight.hpp"
+#include "../ObstacleAvoidance.hpp"
+#include "../ObstacleEstimator.hpp"
 #include "../Utilities.hpp"
 
 namespace NSB
@@ -48,6 +50,8 @@ namespace NSB
     {
       Ellipse m_path;
       LineOfSight m_los;
+      ObstacleEstimator m_obs_est;
+      ObstacleAvoidance m_obs_avoid;
       double m_path_parameter;
       Delta m_last_step;
 
@@ -56,6 +60,8 @@ namespace NSB
 
       // External activation
       bool m_active;
+      bool m_has_obstacle;
+      double m_lat0, m_lon0;
 
       double m_T_start, m_T_stop, m_param_stop;
 
@@ -66,6 +72,7 @@ namespace NSB
         DUNE::Tasks::Task(name, ctx)
       {
         bind<IMC::EstimatedState>(this);
+        bind<IMC::Target>(this);
 
         m_path = Ellipse(0.71881387, -0.15195186, 0., 50., 30., 0., -0.6585325752983525, 0., false, M_PI_2, 0.);
         m_los = LineOfSight(15., false, 1.3, 0.5);
@@ -133,6 +140,19 @@ namespace NSB
           .maximumValue("2.")
           .description("Path parameter update gain");
 
+        param("Obstacle Avoidance -- Minimum Cone Angle", m_obs_avoid.m_cone_min)
+          .defaultValue("5")
+          .minimumValue("1")
+          .maximumValue("30");
+        param("Obstacle Avoidance -- Radius", m_obs_avoid.m_obstacle_radius)
+          .defaultValue("5")
+          .minimumValue("1")
+          .maximumValue("30");
+        param("Obstacle Avoidance -- Hysteresis", m_obs_avoid.m_hysteresis)
+          .defaultValue("3")
+          .minimumValue("0")
+          .maximumValue("10");
+
         param("Active", m_active)
           .defaultValue("false");
 
@@ -175,6 +195,14 @@ namespace NSB
           else
             requestDeactivation();
         }
+        if (paramChanged(m_obs_avoid.m_cone_min))
+        {
+          m_obs_avoid.m_cone_min = Angles::radians(m_obs_avoid.m_cone_min);
+        }
+        if (paramChanged(m_obs_avoid.m_hysteresis))
+        {
+          m_obs_avoid.m_hysteresis = Angles::radians(m_obs_avoid.m_hysteresis);
+        }
       }
 
       void
@@ -194,8 +222,18 @@ namespace NSB
       }
 
       void
+      consume(const IMC::Target* msg)
+      {
+        m_obs_est.update(msg, m_lat0, m_lon0);
+        m_obs_est.simulate(Clock::getSinceEpoch());
+        m_has_obstacle = true;
+      }
+
+      void
       consume(const IMC::EstimatedState* msg)
       {
+        m_lat0 = msg->lat;
+        m_lon0 = msg->lon;
         if (isActive())
         {
           GeometricPath::PathReference path_ref;
@@ -226,6 +264,13 @@ namespace NSB
 
           //debug("Path error: x = %.2f, y = %.2f", path_err.x, path_err.y);
           //debug("LOS vector: x = %.2f, y = %.2f", out.velocity.x, out.velocity.y);
+
+          if (m_has_obstacle)
+          {
+            m_obs_est.simulate(Clock::getSinceEpoch());
+            m_obs_avoid.step(msg->x, msg->y, m_obs_est.m_obstacle_state, 0., out);
+            //debug("LOS vector after OA: x = %.2f, y = %.2f, z = %.2f", out.velocity.x, out.velocity.y, out.velocity.z);
+          }
 
           m_linstate.vx = out.velocity.x;
           m_linstate.vy = out.velocity.y;

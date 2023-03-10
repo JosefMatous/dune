@@ -307,6 +307,7 @@ namespace NSB
 
           if (m_has_obstacle)
           {
+            m_obs_est.simulate(Clock::getSinceEpoch());
             m_obs_avoid.step(m_nsb_state.x, m_nsb_state.y, 
                             m_obs_est.m_obstacle_state, m_nsb_state.r_f, los_out);
             //debug("LOS vector after OA: x = %.2f, y = %.2f, z = %.2f", los_out.velocity.x, los_out.velocity.y, los_out.velocity.z);
