@@ -46,22 +46,21 @@ namespace NSB
     {
       struct 
       {
-        //! Speed.
-        float U;
-        //! Latitude of the origin.
-        double lat;
-        //! Longitude of the origin.
-        double lon;
-        //! Course.
-        float psi;
-        //! Depth.
-        float z;
+        //! Initial position.
+        float x0;
+        //! Initial position.
+        float y0;
+        //! Velocity.
+        float v_x;
+        //! Velocity
+        float v_y;
       } m_params;
 
-      IMC::Target m_message;
+      IMC::Obstacle m_message;
 
       bool m_active;
       float m_x, m_y;
+      Delta m_delta;
 
       //! Constructor.
       //! @param[in] name task name.
@@ -69,15 +68,13 @@ namespace NSB
       Task(const std::string& name, Tasks::Context& ctx):
         DUNE::Tasks::Periodic(name, ctx)
       {
-        param("Speed", m_params.U)
-          .defaultValue("0.8");
-        param("Origin Latitude", m_params.lat)
-          .defaultValue("0.7188178");
-        param("Origin Longitude", m_params.lon)
-          .defaultValue("-0.15193965");
-        param("Course", m_params.psi)
+        param("Initial Position -- x", m_params.x0)
           .defaultValue("0");
-        param("Depth", m_params.z)
+        param("Initial Position -- y", m_params.y0)
+          .defaultValue("0");
+        param("Velocity -- x", m_params.v_x)
+          .defaultValue("0");
+        param("Velocity -- y", m_params.v_y)
           .defaultValue("0");
         param("Active", m_active)
           .defaultValue("false");
@@ -98,11 +95,12 @@ namespace NSB
         reset();
       }
 
-      void
+      inline void
       reset(void)
       {
-        m_x = 0.;
-        m_y = 0.;
+        m_x = m_params.x0;
+        m_y = m_params.y0;
+        m_delta.reset();
         debug("Obstacle reset");
       }
 
@@ -112,20 +110,16 @@ namespace NSB
       {
         if (m_active)
         {
-          float dU = m_params.U / getFrequency();
+          double delta_t = m_delta.getDelta();
           
-          m_x += dU * std::cos(m_params.psi);
-          m_y += dU * std::sin(m_params.psi);
+          m_x += m_params.v_x * delta_t;
+          m_y += m_params.v_y * delta_t;
 
-          m_message.label = "obstacle";
-          m_message.sog = m_params.U;
-          m_message.cog = m_params.psi;
-
-          m_message.lat = m_params.lat;
-          m_message.lon = m_params.lon;
-          WGS84::displace(m_x, m_y, &m_message.lat, &m_message.lon);
+          m_message.x = m_x;
+          m_message.y = m_y;
+          m_message.v_x = m_params.v_x;
+          m_message.v_y = m_params.v_y;
           debug("Obstacle at (%f, %f)", m_x, m_y);
-
           dispatch(m_message);
         }
       }

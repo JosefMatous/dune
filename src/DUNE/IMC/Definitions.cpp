@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: de3f20d1a93e93aefc1cee7375f1fb92                            *
+// IMC XML MD5: 9a34271857f8049443eae4aeb4ccec8e                            *
 //***************************************************************************
 
 // ISO C++ 98 headers.
@@ -28068,94 +28068,6 @@ namespace DUNE
       IMC::toJSON(os__, "reason", reason, nindent__);
     }
 
-    CurvedPathReference::CurvedPathReference(void)
-    {
-      m_header.mgid = 2021;
-      clear();
-    }
-
-    void
-    CurvedPathReference::clear(void)
-    {
-      param = 0;
-      lat = 0;
-      lon = 0;
-      z = 0;
-      theta = 0;
-      psi = 0;
-    }
-
-    bool
-    CurvedPathReference::fieldsEqual(const Message& msg__) const
-    {
-      const IMC::CurvedPathReference& other__ = static_cast<const CurvedPathReference&>(msg__);
-      if (param != other__.param) return false;
-      if (lat != other__.lat) return false;
-      if (lon != other__.lon) return false;
-      if (z != other__.z) return false;
-      if (theta != other__.theta) return false;
-      if (psi != other__.psi) return false;
-      return true;
-    }
-
-    int
-    CurvedPathReference::validate(void) const
-    {
-      if (lat < -1.5707963267948966 || lat > 1.5707963267948966) return false;
-      if (lon < -3.141592653589793 || lon > 3.141592653589793) return false;
-      return true;
-    }
-
-    uint8_t*
-    CurvedPathReference::serializeFields(uint8_t* bfr__) const
-    {
-      uint8_t* ptr__ = bfr__;
-      ptr__ += IMC::serialize(param, ptr__);
-      ptr__ += IMC::serialize(lat, ptr__);
-      ptr__ += IMC::serialize(lon, ptr__);
-      ptr__ += IMC::serialize(z, ptr__);
-      ptr__ += IMC::serialize(theta, ptr__);
-      ptr__ += IMC::serialize(psi, ptr__);
-      return ptr__;
-    }
-
-    uint16_t
-    CurvedPathReference::deserializeFields(const uint8_t* bfr__, uint16_t size__)
-    {
-      const uint8_t* start__ = bfr__;
-      bfr__ += IMC::deserialize(param, bfr__, size__);
-      bfr__ += IMC::deserialize(lat, bfr__, size__);
-      bfr__ += IMC::deserialize(lon, bfr__, size__);
-      bfr__ += IMC::deserialize(z, bfr__, size__);
-      bfr__ += IMC::deserialize(theta, bfr__, size__);
-      bfr__ += IMC::deserialize(psi, bfr__, size__);
-      return bfr__ - start__;
-    }
-
-    uint16_t
-    CurvedPathReference::reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__)
-    {
-      const uint8_t* start__ = bfr__;
-      bfr__ += IMC::reverseDeserialize(param, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(lat, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(lon, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(z, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(theta, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(psi, bfr__, size__);
-      return bfr__ - start__;
-    }
-
-    void
-    CurvedPathReference::fieldsToJSON(std::ostream& os__, unsigned nindent__) const
-    {
-      IMC::toJSON(os__, "param", param, nindent__);
-      IMC::toJSON(os__, "lat", lat, nindent__);
-      IMC::toJSON(os__, "lon", lon, nindent__);
-      IMC::toJSON(os__, "z", z, nindent__);
-      IMC::toJSON(os__, "theta", theta, nindent__);
-      IMC::toJSON(os__, "psi", psi, nindent__);
-    }
-
     NSBMsg::NSBMsg(void)
     {
       m_header.mgid = 2022;
@@ -28326,6 +28238,86 @@ namespace DUNE
       IMC::toJSON(os__, "z", z, nindent__);
       IMC::toJSON(os__, "r_f", r_f, nindent__);
       IMC::toJSON(os__, "p", p, nindent__);
+    }
+
+    Obstacle::Obstacle(void)
+    {
+      m_header.mgid = 2024;
+      clear();
+    }
+
+    void
+    Obstacle::clear(void)
+    {
+      x = 0;
+      y = 0;
+      v_x = 0;
+      v_y = 0;
+      t = 0;
+    }
+
+    bool
+    Obstacle::fieldsEqual(const Message& msg__) const
+    {
+      const IMC::Obstacle& other__ = static_cast<const Obstacle&>(msg__);
+      if (x != other__.x) return false;
+      if (y != other__.y) return false;
+      if (v_x != other__.v_x) return false;
+      if (v_y != other__.v_y) return false;
+      if (t != other__.t) return false;
+      return true;
+    }
+
+    int
+    Obstacle::validate(void) const
+    {
+      return true;
+    }
+
+    uint8_t*
+    Obstacle::serializeFields(uint8_t* bfr__) const
+    {
+      uint8_t* ptr__ = bfr__;
+      ptr__ += IMC::serialize(x, ptr__);
+      ptr__ += IMC::serialize(y, ptr__);
+      ptr__ += IMC::serialize(v_x, ptr__);
+      ptr__ += IMC::serialize(v_y, ptr__);
+      ptr__ += IMC::serialize(t, ptr__);
+      return ptr__;
+    }
+
+    uint16_t
+    Obstacle::deserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      const uint8_t* start__ = bfr__;
+      bfr__ += IMC::deserialize(x, bfr__, size__);
+      bfr__ += IMC::deserialize(y, bfr__, size__);
+      bfr__ += IMC::deserialize(v_x, bfr__, size__);
+      bfr__ += IMC::deserialize(v_y, bfr__, size__);
+      bfr__ += IMC::deserialize(t, bfr__, size__);
+      return bfr__ - start__;
+    }
+
+    uint16_t
+    Obstacle::reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      const uint8_t* start__ = bfr__;
+      bfr__ += IMC::reverseDeserialize(x, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(y, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(v_x, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(v_y, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(t, bfr__, size__);
+      return bfr__ - start__;
+    }
+
+    void
+    Obstacle::fieldsToJSON(std::ostream& os__, unsigned nindent__) const
+    {
+      IMC::toJSON(os__, "x", x, nindent__);
+      IMC::toJSON(os__, "y", y, nindent__);
+      IMC::toJSON(os__, "v_x", v_x, nindent__);
+      IMC::toJSON(os__, "v_y", v_y, nindent__);
+      IMC::toJSON(os__, "t", t, nindent__);
     }
   }
 }

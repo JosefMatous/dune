@@ -61,8 +61,6 @@ namespace NSB
         float path_param, x, y, z, r_f;
       } m_nsb_state;
 
-      IMC::CurvedPathReference m_path_ref;
-
       // Obstacle avoidance
       ObstacleAvoidance m_obs_avoid;
       ObstacleEstimator m_obs_est;
@@ -86,7 +84,7 @@ namespace NSB
       {
         bind<IMC::EstimatedState>(this);
         bind<IMC::NSBState>(this);
-        bind<IMC::Target>(this);
+        bind<IMC::Obstacle>(this);
 
         m_linstate.flags = IMC::DesiredLinearState::FL_VX | IMC::DesiredLinearState::FL_VY | IMC::DesiredLinearState::FL_VZ;
 
@@ -265,7 +263,7 @@ namespace NSB
       }
 
       void
-      consume(const IMC::Target* msg)
+      consume(const IMC::Obstacle* msg)
       {
         m_obs_est.update(msg, m_lat0, m_lon0);
         m_obs_est.simulate(Clock::getSinceEpoch());
@@ -283,17 +281,6 @@ namespace NSB
           m_path.getPathReference(m_nsb_state.path_param, path_ref);
 
           //debug("Vehicle at x = %.2f, y = %.2f", msg->x, msg->y);
-
-          // Dispatch path reference
-          m_path_ref.param = m_nsb_state.path_param;
-          m_path_ref.lat = msg->lat;
-          m_path_ref.lon = msg->lon;
-          WGS84::displace(path_ref.x, path_ref.y, &m_path_ref.lat, &m_path_ref.lon);
-          m_path_ref.z = path_ref.z;
-          m_path_ref.theta = path_ref.theta;
-          m_path_ref.psi = path_ref.psi;
-          dispatch(m_path_ref);
-
           //debug("Path reference: x = %.2f, y = %.2f, z = %.2f", path_ref.x, path_ref.y, path_ref.z);
           //debug("Path parameter %.3f", m_current_state.nsb_state.path_param);
 

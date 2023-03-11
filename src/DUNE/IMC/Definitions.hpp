@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: de3f20d1a93e93aefc1cee7375f1fb92                            *
+// IMC XML MD5: 9a34271857f8049443eae4aeb4ccec8e                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_DEFINITIONS_HPP_INCLUDED_
@@ -26563,77 +26563,6 @@ namespace DUNE
       fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
     };
 
-    //! Curved Path Reference.
-    class CurvedPathReference: public Message
-    {
-    public:
-      //! Path Parameter.
-      fp32_t param;
-      //! Latitude (WGS-84).
-      fp64_t lat;
-      //! Longitude (WGS-84).
-      fp64_t lon;
-      //! Depth.
-      fp32_t z;
-      //! Pitch angle.
-      fp32_t theta;
-      //! Yaw angle.
-      fp32_t psi;
-
-      static uint16_t
-      getIdStatic(void)
-      {
-        return 2021;
-      }
-
-      CurvedPathReference(void);
-
-      CurvedPathReference*
-      clone(void) const
-      {
-        return new CurvedPathReference(*this);
-      }
-
-      void
-      clear(void);
-
-      bool
-      fieldsEqual(const Message& msg__) const;
-
-      int
-      validate(void) const;
-
-      uint8_t*
-      serializeFields(uint8_t* bfr__) const;
-
-      uint16_t
-      deserializeFields(const uint8_t* bfr__, uint16_t size__);
-
-      uint16_t
-      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
-
-      uint16_t
-      getId(void) const
-      {
-        return CurvedPathReference::getIdStatic();
-      }
-
-      const char*
-      getName(void) const
-      {
-        return "CurvedPathReference";
-      }
-
-      unsigned
-      getFixedSerializationSize(void) const
-      {
-        return 32;
-      }
-
-      void
-      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
-    };
-
     //! NSB Message.
     class NSBMsg: public Message
     {
@@ -26764,6 +26693,75 @@ namespace DUNE
       getName(void) const
       {
         return "NSBState";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 24;
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! Obstacle.
+    class Obstacle: public Message
+    {
+    public:
+      //! x position.
+      fp32_t x;
+      //! y position.
+      fp32_t y;
+      //! x velocity.
+      fp32_t v_x;
+      //! y velocity.
+      fp32_t v_y;
+      //! Clock.
+      fp64_t t;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 2024;
+      }
+
+      Obstacle(void);
+
+      Obstacle*
+      clone(void) const
+      {
+        return new Obstacle(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return Obstacle::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "Obstacle";
       }
 
       unsigned

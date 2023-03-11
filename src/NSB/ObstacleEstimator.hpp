@@ -60,12 +60,13 @@ namespace NSB
 
         //! Updates the obstacle state (including the timestamp)
         inline void
-        update(const IMC::Target* msg, double lat0, double lon0)
+        update(const IMC::Obstacle* msg, double lat0, double lon0)
         {
           m_obstacle_state.timestamp = msg->getTimeStamp();
-          m_obstacle_state.vx = msg->sog * std::cos(msg->cog);
-          m_obstacle_state.vy = msg->sog * std::sin(msg->cog);
-          WGS84::displacement(lat0, lon0, 0., msg->lat, msg->lon, 0., &m_obstacle_state.x, &m_obstacle_state.y);
+          m_obstacle_state.x = msg->x;
+          m_obstacle_state.y = msg->y;
+          m_obstacle_state.vx = msg->v_x;
+          m_obstacle_state.vy = msg->v_y;          
         }
 
         //! Get obstacle state at a given timestamp

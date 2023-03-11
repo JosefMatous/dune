@@ -56,7 +56,6 @@ namespace NSB
       Delta m_last_step;
 
       IMC::DesiredLinearState m_linstate;
-      IMC::CurvedPathReference m_path_ref;
 
       // External activation
       bool m_active;
@@ -72,7 +71,7 @@ namespace NSB
         DUNE::Tasks::Task(name, ctx)
       {
         bind<IMC::EstimatedState>(this);
-        bind<IMC::Target>(this);
+        bind<IMC::Obstacle>(this);
 
         m_path = Ellipse(0.71881387, -0.15195186, 0., 50., 30., 0., -0.6585325752983525, 0., false, M_PI_2, 0.);
         m_los = LineOfSight(15., false, 1.3, 0.5);
@@ -222,7 +221,7 @@ namespace NSB
       }
 
       void
-      consume(const IMC::Target* msg)
+      consume(const IMC::Obstacle* msg)
       {
         m_obs_est.update(msg, m_lat0, m_lon0);
         m_obs_est.simulate(Clock::getSinceEpoch());
@@ -240,17 +239,6 @@ namespace NSB
           m_path.getPathReference(m_path_parameter, path_ref);
 
           //debug("Vehicle at x = %.2f, y = %.2f", msg->x, msg->y);
-
-          // Dispatch path reference
-          m_path_ref.param = m_path_parameter;
-          m_path_ref.lat = msg->lat;
-          m_path_ref.lon = msg->lon;
-          WGS84::displace(path_ref.x, path_ref.y, &m_path_ref.lat, &m_path_ref.lon);
-          m_path_ref.z = path_ref.z;
-          m_path_ref.theta = path_ref.theta;
-          m_path_ref.psi = path_ref.psi;
-          dispatch(m_path_ref);
-
           //debug("Path reference: x = %.2f, y = %.2f, z = %.2f", path_ref.x, path_ref.y, path_ref.z);
           //debug("Path parameter %.3f", m_path_parameter);
 

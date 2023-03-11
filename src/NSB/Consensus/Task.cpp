@@ -96,7 +96,7 @@ namespace NSB
         bind<IMC::EstimatedState>(this);
         bind<IMC::DesiredLinearState>(this);
         bind<IMC::NSBMsg>(this);
-        bind<IMC::Target>(this);
+        bind<IMC::Obstacle>(this);
 
         m_params.los = &m_los;
         m_params.path = &m_path;
@@ -403,7 +403,7 @@ namespace NSB
       }
 
       void
-      consume(const IMC::Target* msg)
+      consume(const IMC::Obstacle* msg)
       {
         m_obs_est.update(msg, m_lat0, m_lon0);
         m_has_obstacle = true;
