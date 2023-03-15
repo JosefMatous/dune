@@ -50,10 +50,9 @@ namespace NSB
     };
 
     inline void
-    convert(const IMC::NSBMsg* src, StateEstimate& dest)
+    convert(const IMC::NSBMsg* src, StateEstimate& dest, double lat0, double lon0)
     {
-      dest.p_b.x = src->x;
-      dest.p_b.y = src->y;
+      WGS84::displacement(lat0, lon0, 0., src->lat, src->lon, 0., &dest.p_b.x, &dest.p_b.y);  
       dest.p_b.z = src->z;
       dest.path_param = src->path_param;
       dest.r_f = src->r_f;
@@ -61,10 +60,9 @@ namespace NSB
     }
 
     inline void
-    convert(const IMC::NSBMsg& src, StateEstimate& dest)
+    convert(const IMC::NSBMsg& src, StateEstimate& dest, double lat0, double lon0)
     {
-      dest.p_b.x = src.x;
-      dest.p_b.y = src.y;
+      WGS84::displacement(lat0, lon0, 0., src.lat, src.lon, 0., &dest.p_b.x, &dest.p_b.y);  
       dest.p_b.z = src.z;
       dest.path_param = src.path_param;
       dest.r_f = src.r_f;
@@ -72,10 +70,11 @@ namespace NSB
     }
 
     inline void
-    convert(StateEstimate& src, IMC::NSBMsg& dest)
+    convert(const StateEstimate& src, IMC::NSBMsg& dest, double lat0, double lon0)
     {
-      dest.x = src.p_b.x;
-      dest.y = src.p_b.y;
+      dest.lat = lat0;
+      dest.lon = lon0;
+      WGS84::displace(src.p_b.x, src.p_b.y, &dest.lat, &dest.lon);
       dest.z = src.p_b.z;
       dest.path_param = src.path_param;
       dest.r_f = src.r_f;
@@ -83,7 +82,7 @@ namespace NSB
     }
        
     inline void
-    convert(StateEstimate& src, IMC::NSBState& dest)
+    convert(const StateEstimate& src, IMC::NSBState& dest)
     {
       dest.x = src.p_b.x;
       dest.y = src.p_b.y;

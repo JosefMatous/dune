@@ -65,11 +65,12 @@ namespace NSB
       ObstacleAvoidance m_obs_avoid;
       ObstacleEstimator m_obs_est;
       double m_lat0, m_lon0;
+      double m_path_lat, m_path_lon;
       bool m_has_obstacle;
 
       // External activation
       bool m_active;
-      bool is_initialized;
+      bool is_initialized, has_estate;
 
       double m_T_start, m_T_stop, m_param_stop;
 
@@ -84,19 +85,18 @@ namespace NSB
       {
         bind<IMC::EstimatedState>(this);
         bind<IMC::NSBState>(this);
-        bind<IMC::Obstacle>(this);
+        bind<IMC::Target>(this);
 
         m_linstate.flags = IMC::DesiredLinearState::FL_VX | IMC::DesiredLinearState::FL_VY | IMC::DesiredLinearState::FL_VZ;
 
         m_T_start = -1.;
         is_initialized = false;
+        has_estate = false;
 
-        param("Ellipse -- Origin x", m_path.m_x_center)
-          .defaultValue("0")
-          .description("x-coordinate of the center of the ellipse");
-        param("Ellipse -- Origin y", m_path.m_y_center)
-          .defaultValue("0")
-          .description("y-coordinate of the center of the ellipse");
+        param("Ellipse -- Origin Latitude", m_path_lat)
+          .defaultValue("0.71881387");
+        param("Ellipse -- Origin Longitude", m_path_lon)
+          .defaultValue("-0.15195186");
         param("Ellipse -- Depth", m_path.m_z_center)
           .defaultValue("0.")
           .description("Depth of the center of the ellipse");
@@ -203,6 +203,15 @@ namespace NSB
         reset();
       }
 
+      inline void
+      updatePathOrigin(void)
+      {
+        if (has_estate)
+        {
+          WGS84::displacement(m_lat0, m_lon0, 0., m_path_lat, m_path_lon, 0., &m_path.m_x_center, &m_path.m_y_center);       
+        }
+      }
+
       void
       onUpdateParameters(void)
       {
@@ -231,6 +240,10 @@ namespace NSB
         if (paramChanged(m_obs_avoid.m_hysteresis))
         {
           m_obs_avoid.m_hysteresis = Angles::radians(m_obs_avoid.m_hysteresis);
+        }
+        if (paramChanged(m_path_lat) || paramChanged(m_path_lon))
+        {
+          updatePathOrigin();
         }
       }
 
@@ -263,7 +276,7 @@ namespace NSB
       }
 
       void
-      consume(const IMC::Obstacle* msg)
+      consume(const IMC::Target* msg)
       {
         m_obs_est.update(msg, m_lat0, m_lon0);
         m_obs_est.simulate(Clock::getSinceEpoch());
@@ -275,6 +288,11 @@ namespace NSB
       {
         m_lat0 = msg->lat;
         m_lon0 = msg->lon;
+        if (!has_estate)
+        {
+          has_estate = true;
+          updatePathOrigin();
+        }
         if (isActive() && is_initialized)
         {
           GeometricPath::PathReference path_ref;
@@ -295,6 +313,7 @@ namespace NSB
           if (m_has_obstacle)
           {
             m_obs_est.simulate(Clock::getSinceEpoch());
+            //debug("Obstacle at x = %.2f, y = %.2f. Speed v_x = %.2f, v_y = %.2f", m_obs_est.m_obstacle_state.x, m_obs_est.m_obstacle_state.y, m_obs_est.m_obstacle_state.vx, m_obs_est.m_obstacle_state.vy);
             m_obs_avoid.step(m_nsb_state.x, m_nsb_state.y, 
                             m_obs_est.m_obstacle_state, m_nsb_state.r_f, los_out);
             //debug("LOS vector after OA: x = %.2f, y = %.2f, z = %.2f", los_out.velocity.x, los_out.velocity.y, los_out.velocity.z);

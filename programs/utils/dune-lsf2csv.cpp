@@ -58,17 +58,17 @@ write_target_header(std::ofstream& out)
 }
 
 inline void
-write_obstacle_header(std::ofstream& out)
-{
-  write_common_header(out);
-  out << "x (m), y(m), v_x (m/s), v_y (m/s)" << std::endl;
-}
-
-inline void
-write_nsb_header(std::ofstream& out)
+write_nsbstate_header(std::ofstream& out)
 {
   write_common_header(out);
   out << "path_param, x (m), y (m), z (m), r_f (m), P" << std::endl;
+}
+
+inline void
+write_nsbmsg_header(std::ofstream& out)
+{
+  write_common_header(out);
+  out << "path_param, lat (rad), lon (rad), z (m), r_f (m), P" << std::endl;
 }
 
 inline void
@@ -88,19 +88,13 @@ write_header(std::string message_name, std::ofstream& out)
 
   if (message_name == "NSBMsg")
   {
-    write_nsb_header(out);
+    write_nsbmsg_header(out);
     return;
   }
 
   if (message_name == "NSBState")
   {
-    write_nsb_header(out);
-    return;
-  }
-
-  if (message_name == "Obstacle")
-  {
-    write_obstacle_header(out);
+    write_nsbstate_header(out);
     return;
   }
 
@@ -180,10 +174,12 @@ write_message(const DUNE::IMC::NSBMsg* msg, std::ofstream& out)
   write_timestamp_and_source(msg, out);
 
   out.precision(6);
-  out << msg->path_param << ", " <<
-        msg->x << ", " <<
-        msg->y << ", " <<
-        msg->z << ", " <<
+  out << msg->path_param << ", ";
+
+  out.precision(8);
+  out << msg->lat << ", " << msg->lon << ", ";
+  out.precision(6);
+  out << msg->z << ", " <<
         msg->r_f << ", " <<
         msg->p << std::endl;
 }
@@ -200,18 +196,6 @@ write_message(const DUNE::IMC::NSBState* msg, std::ofstream& out)
         msg->z << ", " <<
         msg->r_f << ", " <<
         msg->p << std::endl;
-}
-
-inline void
-write_message(const DUNE::IMC::Obstacle* msg, std::ofstream& out)
-{
-  write_timestamp_and_source(msg, out);
-
-  out.precision(6);
-  out << msg->x << ", " <<
-        msg->y << ", " <<
-        msg->v_x << ", " <<
-        msg->v_y << std::endl;
 }
 
 inline void
@@ -240,12 +224,6 @@ write_message(const DUNE::IMC::Message* msg, std::ofstream& out)
     write_message((const IMC::NSBState*) msg, out);
     return;
   }
-
-  if (msg->getId() == DUNE_IMC_OBSTACLE)
-  {
-    write_message((const IMC::Obstacle*) msg, out);
-    return;
-  }
 }
 
 const char*
@@ -271,10 +249,6 @@ get_message_name(const DUNE::IMC::Message* msg)
     return "NSBState";
   }
 
-  if (msg->getId() == DUNE_IMC_OBSTACLE)
-  {
-    return "Obstacle";
-  }
   return "";
 }
 

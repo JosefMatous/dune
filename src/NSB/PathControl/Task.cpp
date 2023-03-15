@@ -80,6 +80,9 @@ namespace NSB
       float m_vertical_integrator;
       float m_last_z;
 
+      double m_lat0, m_lon0;
+      bool has_estate;
+
       struct
       {
         float x, y, z;
@@ -130,10 +133,10 @@ namespace NSB
           .defaultValue("30");
         param("Collision Ellipse -- Orientations", m_monitor_params.angle)
           .defaultValue("0");
-        param("Collision Ellipse -- Origin x", m_monitor_params.x0)
-          .defaultValue("0");
-        param("Collision Ellipse -- Origin y", m_monitor_params.y0)
-          .defaultValue("0");
+        param("Collision Ellipse -- Origin Latitude", m_monitor_params.x0)
+          .defaultValue("0.71881387");
+        param("Collision Ellipse -- Origin Longitude", m_monitor_params.y0)
+          .defaultValue("-0.15195186");
         param("Collision Ellipse -- Inside", m_monitor_params.inside)
           .defaultValue("true");   
         param("Collision Ellipse -- Intersection", m_monitor_params.intersection)
@@ -142,6 +145,29 @@ namespace NSB
         m_speed.speed_units = IMC::SUNITS_METERS_PS;
 
         reset();
+      }
+
+      inline void
+      updateEllipses(void)
+      {
+        if (has_estate)
+        {
+          size_t n_ellipses = m_monitor_params.a.size();
+          if ((m_monitor_params.b.size() != n_ellipses) || (m_monitor_params.angle.size() != n_ellipses) || (m_monitor_params.x0.size() != n_ellipses) || (m_monitor_params.y0.size() != n_ellipses))
+          {
+            war("Incompatible size of parameter vectors");
+            return;
+          }
+          if (m_ellipses.size() != n_ellipses)
+            m_ellipses.resize(n_ellipses);
+
+          double x0, y0;
+          for (size_t i = 0; i < n_ellipses; i++)
+          {
+            WGS84::displacement(m_lat0, m_lon0, 0., m_monitor_params.x0[i], m_monitor_params.y0[i], 0., &x0, &y0);
+            m_ellipses[i] = CollisionEllipse<float>(m_monitor_params.a[i], m_monitor_params.b[i], m_monitor_params.angle[i], x0, y0);
+          }   
+        }
       }
 
       void
@@ -172,19 +198,7 @@ namespace NSB
 
         if (paramChanged(m_monitor_params.a) || paramChanged(m_monitor_params.b) || paramChanged(m_monitor_params.angle) || paramChanged(m_monitor_params.x0) || paramChanged(m_monitor_params.y0))
         {
-          size_t n_ellipses = m_monitor_params.a.size();
-          if ((m_monitor_params.b.size() != n_ellipses) || (m_monitor_params.angle.size() != n_ellipses) || (m_monitor_params.x0.size() != n_ellipses) || (m_monitor_params.y0.size() != n_ellipses))
-          {
-            war("Incompatible size of parameter vectors");
-            return;
-          }
-          if (m_ellipses.size() != n_ellipses)
-            m_ellipses.resize(n_ellipses);
-
-          for (size_t i = 0; i < n_ellipses; i++)
-          {
-            m_ellipses[i] = CollisionEllipse<float>(m_monitor_params.a[i], m_monitor_params.b[i], m_monitor_params.angle[i], m_monitor_params.x0[i], m_monitor_params.y0[i]);
-          }          
+          updateEllipses();       
         }
       }
 
@@ -290,6 +304,13 @@ namespace NSB
       void
       step(const IMC::EstimatedState& state, const TrackingState& ts)
       {
+        if (!has_estate)
+        {
+          m_lat0 = state.lat;
+          m_lon0 = state.lon;
+          has_estate = true;
+          updateEllipses();
+        }
         if (!m_active) // behave as a path controller
         {
           m_desired_velocity.x = ts.end.x - state.x;

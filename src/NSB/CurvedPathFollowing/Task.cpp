@@ -52,14 +52,14 @@ namespace NSB
       LineOfSight m_los;
       ObstacleEstimator m_obs_est;
       ObstacleAvoidance m_obs_avoid;
-      double m_path_parameter;
+      double m_path_parameter, m_path_lat, m_path_lon;
       Delta m_last_step;
 
       IMC::DesiredLinearState m_linstate;
 
       // External activation
       bool m_active;
-      bool m_has_obstacle;
+      bool m_has_obstacle, is_initialized;
       double m_lat0, m_lon0;
 
       double m_T_start, m_T_stop, m_param_stop;
@@ -71,21 +71,19 @@ namespace NSB
         DUNE::Tasks::Task(name, ctx)
       {
         bind<IMC::EstimatedState>(this);
-        bind<IMC::Obstacle>(this);
+        bind<IMC::Target>(this);
 
-        m_path = Ellipse(0.71881387, -0.15195186, 0., 50., 30., 0., -0.6585325752983525, 0., false, M_PI_2, 0.);
+        m_path = Ellipse(0, 0, 0., 50., 30., 0., -0.6585325752983525, 0., false, M_PI_2, 0.);
         m_los = LineOfSight(15., false, 1.3, 0.5);
 
         m_linstate.flags = IMC::DesiredLinearState::FL_VX | IMC::DesiredLinearState::FL_VY | IMC::DesiredLinearState::FL_VZ;
 
         m_T_start = -1.;
 
-        param("Ellipse -- Origin x", m_path.m_x_center)
-          .defaultValue("0")
-          .description("x-coordinate of the center of the ellipse");
-        param("Ellipse -- Origin y", m_path.m_y_center)
-          .defaultValue("0")
-          .description("y-coordinate of the center of the ellipse");
+        param("Ellipse -- Origin Latitude", m_path_lat)
+          .defaultValue("0.71881387");
+        param("Ellipse -- Origin Longitude", m_path_lon)
+          .defaultValue("-0.15195186");
         param("Ellipse -- Depth", m_path.m_z_center)
           .defaultValue("0.")
           .description("Depth of the center of the ellipse");
@@ -163,6 +161,7 @@ namespace NSB
           .description("The task is stop when path parameter exceeds the given value. Enter negative value to ignore this.");
 
         setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_IDLE);
+        is_initialized = false;
       }
 
       void
@@ -177,6 +176,15 @@ namespace NSB
       {
         setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_IDLE);
         reset();
+      }
+
+      inline void
+      updatePathOrigin(void)
+      {
+        if (is_initialized)
+        {
+          WGS84::displacement(m_lat0, m_lon0, 0., m_path_lat, m_path_lon, 0., &m_path.m_x_center, &m_path.m_y_center);       
+        }
       }
 
       void
@@ -202,6 +210,10 @@ namespace NSB
         {
           m_obs_avoid.m_hysteresis = Angles::radians(m_obs_avoid.m_hysteresis);
         }
+        if (paramChanged(m_path_lat) || paramChanged(m_path_lon))
+        {
+          updatePathOrigin();
+        }
       }
 
       void
@@ -221,7 +233,7 @@ namespace NSB
       }
 
       void
-      consume(const IMC::Obstacle* msg)
+      consume(const IMC::Target* msg)
       {
         m_obs_est.update(msg, m_lat0, m_lon0);
         m_obs_est.simulate(Clock::getSinceEpoch());
@@ -233,6 +245,11 @@ namespace NSB
       {
         m_lat0 = msg->lat;
         m_lon0 = msg->lon;
+        if (!is_initialized)
+        {
+          is_initialized = true;
+          updatePathOrigin();
+        }
         if (isActive())
         {
           GeometricPath::PathReference path_ref;

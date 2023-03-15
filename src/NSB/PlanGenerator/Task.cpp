@@ -84,7 +84,7 @@ namespace NSB
       ObstacleAvoidance m_obs_avoid;
 
       double m_lat0, m_lon0;
-      bool is_initialized, is_plan_set, is_start_plan_set;
+      bool is_plan_set, is_start_plan_set;
 
       uint16_t request_id, start_request_id;
 
@@ -100,10 +100,8 @@ namespace NSB
         m_los(15., false, 1.3, 0.5),
         m_form(0., 0., 0., 0.25, 0.5)
       {
-        bind<IMC::EstimatedState>(this);
         bind<IMC::PlanControl>(this);
 
-        is_initialized = false;
         is_plan_set = false;
         is_start_plan_set = false;
 
@@ -124,26 +122,26 @@ namespace NSB
           .defaultValue("5");
 
         param("Vehicle -- Initial Position", m_params.p_vehicle)
-          .defaultValue("60, 0, 0")
-          .size(3);
+          .defaultValue("0.7188233, -0.1519519, 0")
+          .size(3)
+          .description("Initial position of the vehicle (latitude, longitude, depth).");
         param("Barycenter -- Initial Position", m_params.p_barycenter)
-          .defaultValue("60, 0, 0")
-          .size(3);
+          .defaultValue("0.7188233, -0.1519519, 0")
+          .size(3)
+          .description("Initial position of the barycenter (latitude, longitude, depth).");
         param("Obstacle -- Active", m_params.use_obstacle)
           .defaultValue("false");
         param("Obstacle -- Initial Position", m_params.p_obstacle)
-          .defaultValue("0, 0");
+          .defaultValue("0.71881387, -0.15195186");
         param("Obstacle -- Speed", m_params.u_obs)
           .defaultValue("0.6667");
         param("Obstacle -- Course", m_params.psi_obs)
           .defaultValue("1.57079632");
 
-        param("Ellipse -- Origin x", m_path.m_x_center)
-          .defaultValue("0")
-          .description("x-coordinate of the center of the ellipse");
-        param("Ellipse -- Origin y", m_path.m_y_center)
-          .defaultValue("0")
-          .description("y-coordinate of the center of the ellipse");
+        param("Ellipse -- Origin Latitude", m_lat0)
+          .defaultValue("0.71881387");
+        param("Ellipse -- Origin Longitude", m_lon0)
+          .defaultValue("-0.15195186");
         param("Ellipse -- Depth", m_path.m_z_center)
           .defaultValue("0.")
           .description("Depth of the center of the ellipse");
@@ -236,15 +234,12 @@ namespace NSB
       inline void
       reset_state(void)
       {
-        m_vehicle_state.x = m_params.p_vehicle[0];
-        m_vehicle_state.y = m_params.p_vehicle[1];
+        WGS84::displacement(m_lat0, m_lon0, 0., m_params.p_vehicle[0], m_params.p_vehicle[1], 0., &m_vehicle_state.x, &m_vehicle_state.y);
         m_vehicle_state.z = m_params.p_vehicle[2];
         m_nsb_state.path_param = 0.;
-        m_nsb_state.x = m_params.p_barycenter[0];
-        m_nsb_state.y = m_params.p_barycenter[1];
+        WGS84::displacement(m_lat0, m_lon0, 0., m_params.p_barycenter[0], m_params.p_barycenter[1], 0., &m_nsb_state.x, &m_nsb_state.y);
         m_nsb_state.z = m_params.p_barycenter[2];
-        m_obstacle_state.x = m_params.p_obstacle[0];
-        m_obstacle_state.y = m_params.p_obstacle[1];
+        WGS84::displacement(m_lat0, m_lon0, 0., m_params.p_obstacle[0], m_params.p_obstacle[1], 0., &m_obstacle_state.x, &m_obstacle_state.y);
         m_obstacle_state.timestamp = 0.;
         updateFormationRadius();
       }
@@ -295,14 +290,6 @@ namespace NSB
         m_pc.clear();
         m_start_spec.clear();
         m_start_pc.clear();
-      }
-
-      void
-      consume(const IMC::EstimatedState* msg)
-      {
-        m_lat0 = msg->lat;
-        m_lon0 = msg->lon;
-        is_initialized = true;
       }
 
       void
@@ -460,11 +447,11 @@ namespace NSB
         double c_psi = std::cos(path_ref.psi);
         double s_psi = std::sin(path_ref.psi);
 
-        double wp_x = m_params.p_vehicle[0] - (m_params.start_offset + 2*m_params.start_distance)*c_psi;
-        double wp_y = m_params.p_vehicle[1] - (m_params.start_offset + 2*m_params.start_distance)*s_psi;
+        double wp_x = - (m_params.start_offset + 2*m_params.start_distance)*c_psi;
+        double wp_y = - (m_params.start_offset + 2*m_params.start_distance)*s_psi;
         IMC::Goto wp;
-        wp.lat = m_lat0;
-        wp.lon = m_lon0;
+        wp.lat = m_params.p_vehicle[0];
+        wp.lon = m_params.p_vehicle[1];
         WGS84::displace(wp_x, wp_y, &wp.lat, &wp.lon);
         wp.z = 0.;
         wp.z_units = IMC::Z_DEPTH;
@@ -477,8 +464,8 @@ namespace NSB
 
         wp_x += m_params.start_distance*c_psi;
         wp_y += m_params.start_distance*s_psi;
-        wp.lat = m_lat0;
-        wp.lon = m_lon0;
+        wp.lat = m_params.p_vehicle[0];
+        wp.lon = m_params.p_vehicle[1];
         WGS84::displace(wp_x, wp_y, &wp.lat, &wp.lon);
         wp.z = 0.;
         wp.z_units = IMC::Z_DEPTH;
@@ -491,8 +478,8 @@ namespace NSB
         wp_x += m_params.start_distance*c_psi;
         wp_y += m_params.start_distance*s_psi;
         IMC::StationKeeping sk;
-        sk.lat = m_lat0;
-        sk.lon = m_lon0;
+        sk.lat = m_params.p_vehicle[0];
+        sk.lon = m_params.p_vehicle[1];
         WGS84::displace(wp_x, wp_y, &sk.lat, &sk.lon);
         sk.z = 0.;
         sk.z_units = IMC::Z_DEPTH;
@@ -533,18 +520,15 @@ namespace NSB
       void
       task(void)
       {
-        if (is_initialized)
+        if (!is_plan_set)
         {
-          if (!is_plan_set)
-          {
-            debug("Generating plan");
-            generate_plan();
-          }
-          if (!is_start_plan_set)
-          {
-            debug("Generating goto_start plan");
-            generate_start_plan();
-          }
+          debug("Generating plan");
+          generate_plan();
+        }
+        if (!is_start_plan_set)
+        {
+          debug("Generating goto_start plan");
+          generate_start_plan();
         }
       }
     };

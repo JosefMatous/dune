@@ -29,6 +29,7 @@
 
 // DUNE headers.
 #include <DUNE/DUNE.hpp>
+#include "../Utilities.hpp"
 
 namespace NSB
 {
@@ -46,17 +47,17 @@ namespace NSB
     {
       struct 
       {
-        //! Initial position.
-        float x0;
-        //! Initial position.
-        float y0;
-        //! Velocity.
+        //! Initial latitude.
+        double lat0;
+        //! Initial longitude.
+        double lon0;
+        //! Velocity x.
         float v_x;
-        //! Velocity
+        //! Velocity y.
         float v_y;
       } m_params;
 
-      IMC::Obstacle m_message;
+      IMC::Target m_message;
 
       bool m_active;
       float m_x, m_y;
@@ -68,16 +69,18 @@ namespace NSB
       Task(const std::string& name, Tasks::Context& ctx):
         DUNE::Tasks::Periodic(name, ctx)
       {
-        param("Initial Position -- x", m_params.x0)
-          .defaultValue("0");
-        param("Initial Position -- y", m_params.y0)
-          .defaultValue("0");
+        param("Initial Latitude", m_params.lat0)
+          .defaultValue("0.7188139"); 
+        param("Initial Longitude", m_params.lon0)
+          .defaultValue("-0.1519519");
         param("Velocity -- x", m_params.v_x)
           .defaultValue("0");
         param("Velocity -- y", m_params.v_y)
           .defaultValue("0");
         param("Active", m_active)
           .defaultValue("false");
+
+        m_message.label = "obstacle";
         
         reset();
       }
@@ -98,8 +101,8 @@ namespace NSB
       inline void
       reset(void)
       {
-        m_x = m_params.x0;
-        m_y = m_params.y0;
+        m_x = 0.;
+        m_y = 0.;
         m_delta.reset();
         debug("Obstacle reset");
       }
@@ -115,10 +118,11 @@ namespace NSB
           m_x += m_params.v_x * delta_t;
           m_y += m_params.v_y * delta_t;
 
-          m_message.x = m_x;
-          m_message.y = m_y;
-          m_message.v_x = m_params.v_x;
-          m_message.v_y = m_params.v_y;
+          m_message.lat = m_params.lat0;
+          m_message.lon = m_params.lon0;
+          WGS84::displace(m_x, m_y, &m_message.lat, &m_message.lon);
+          m_message.sog = std::sqrt(square(m_params.v_x) + square(m_params.v_y));
+          m_message.cog = std::atan2(m_params.v_y, m_params.v_x);
           debug("Obstacle at (%f, %f)", m_x, m_y);
           dispatch(m_message);
         }

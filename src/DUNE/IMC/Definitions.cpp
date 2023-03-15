@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 9a34271857f8049443eae4aeb4ccec8e                            *
+// IMC XML MD5: 4f8aad95e953ecebe938758339b0b1bf                            *
 //***************************************************************************
 
 // ISO C++ 98 headers.
@@ -28078,8 +28078,8 @@ namespace DUNE
     NSBMsg::clear(void)
     {
       path_param = 0;
-      x = 0;
-      y = 0;
+      lat = 0;
+      lon = 0;
       z = 0;
       r_f = 0;
       p = 0;
@@ -28090,8 +28090,8 @@ namespace DUNE
     {
       const IMC::NSBMsg& other__ = static_cast<const NSBMsg&>(msg__);
       if (path_param != other__.path_param) return false;
-      if (x != other__.x) return false;
-      if (y != other__.y) return false;
+      if (lat != other__.lat) return false;
+      if (lon != other__.lon) return false;
       if (z != other__.z) return false;
       if (r_f != other__.r_f) return false;
       if (p != other__.p) return false;
@@ -28109,8 +28109,8 @@ namespace DUNE
     {
       uint8_t* ptr__ = bfr__;
       ptr__ += IMC::serialize(path_param, ptr__);
-      ptr__ += IMC::serialize(x, ptr__);
-      ptr__ += IMC::serialize(y, ptr__);
+      ptr__ += IMC::serialize(lat, ptr__);
+      ptr__ += IMC::serialize(lon, ptr__);
       ptr__ += IMC::serialize(z, ptr__);
       ptr__ += IMC::serialize(r_f, ptr__);
       ptr__ += IMC::serialize(p, ptr__);
@@ -28122,8 +28122,8 @@ namespace DUNE
     {
       const uint8_t* start__ = bfr__;
       bfr__ += IMC::deserialize(path_param, bfr__, size__);
-      bfr__ += IMC::deserialize(x, bfr__, size__);
-      bfr__ += IMC::deserialize(y, bfr__, size__);
+      bfr__ += IMC::deserialize(lat, bfr__, size__);
+      bfr__ += IMC::deserialize(lon, bfr__, size__);
       bfr__ += IMC::deserialize(z, bfr__, size__);
       bfr__ += IMC::deserialize(r_f, bfr__, size__);
       bfr__ += IMC::deserialize(p, bfr__, size__);
@@ -28135,8 +28135,8 @@ namespace DUNE
     {
       const uint8_t* start__ = bfr__;
       bfr__ += IMC::reverseDeserialize(path_param, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(x, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(y, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(lat, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(lon, bfr__, size__);
       bfr__ += IMC::reverseDeserialize(z, bfr__, size__);
       bfr__ += IMC::reverseDeserialize(r_f, bfr__, size__);
       bfr__ += IMC::reverseDeserialize(p, bfr__, size__);
@@ -28147,8 +28147,8 @@ namespace DUNE
     NSBMsg::fieldsToJSON(std::ostream& os__, unsigned nindent__) const
     {
       IMC::toJSON(os__, "path_param", path_param, nindent__);
-      IMC::toJSON(os__, "x", x, nindent__);
-      IMC::toJSON(os__, "y", y, nindent__);
+      IMC::toJSON(os__, "lat", lat, nindent__);
+      IMC::toJSON(os__, "lon", lon, nindent__);
       IMC::toJSON(os__, "z", z, nindent__);
       IMC::toJSON(os__, "r_f", r_f, nindent__);
       IMC::toJSON(os__, "p", p, nindent__);
@@ -28238,86 +28238,6 @@ namespace DUNE
       IMC::toJSON(os__, "z", z, nindent__);
       IMC::toJSON(os__, "r_f", r_f, nindent__);
       IMC::toJSON(os__, "p", p, nindent__);
-    }
-
-    Obstacle::Obstacle(void)
-    {
-      m_header.mgid = 2024;
-      clear();
-    }
-
-    void
-    Obstacle::clear(void)
-    {
-      x = 0;
-      y = 0;
-      v_x = 0;
-      v_y = 0;
-      t = 0;
-    }
-
-    bool
-    Obstacle::fieldsEqual(const Message& msg__) const
-    {
-      const IMC::Obstacle& other__ = static_cast<const Obstacle&>(msg__);
-      if (x != other__.x) return false;
-      if (y != other__.y) return false;
-      if (v_x != other__.v_x) return false;
-      if (v_y != other__.v_y) return false;
-      if (t != other__.t) return false;
-      return true;
-    }
-
-    int
-    Obstacle::validate(void) const
-    {
-      return true;
-    }
-
-    uint8_t*
-    Obstacle::serializeFields(uint8_t* bfr__) const
-    {
-      uint8_t* ptr__ = bfr__;
-      ptr__ += IMC::serialize(x, ptr__);
-      ptr__ += IMC::serialize(y, ptr__);
-      ptr__ += IMC::serialize(v_x, ptr__);
-      ptr__ += IMC::serialize(v_y, ptr__);
-      ptr__ += IMC::serialize(t, ptr__);
-      return ptr__;
-    }
-
-    uint16_t
-    Obstacle::deserializeFields(const uint8_t* bfr__, uint16_t size__)
-    {
-      const uint8_t* start__ = bfr__;
-      bfr__ += IMC::deserialize(x, bfr__, size__);
-      bfr__ += IMC::deserialize(y, bfr__, size__);
-      bfr__ += IMC::deserialize(v_x, bfr__, size__);
-      bfr__ += IMC::deserialize(v_y, bfr__, size__);
-      bfr__ += IMC::deserialize(t, bfr__, size__);
-      return bfr__ - start__;
-    }
-
-    uint16_t
-    Obstacle::reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__)
-    {
-      const uint8_t* start__ = bfr__;
-      bfr__ += IMC::reverseDeserialize(x, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(y, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(v_x, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(v_y, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(t, bfr__, size__);
-      return bfr__ - start__;
-    }
-
-    void
-    Obstacle::fieldsToJSON(std::ostream& os__, unsigned nindent__) const
-    {
-      IMC::toJSON(os__, "x", x, nindent__);
-      IMC::toJSON(os__, "y", y, nindent__);
-      IMC::toJSON(os__, "v_x", v_x, nindent__);
-      IMC::toJSON(os__, "v_y", v_y, nindent__);
-      IMC::toJSON(os__, "t", t, nindent__);
     }
   }
 }

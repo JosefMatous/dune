@@ -66,6 +66,7 @@ namespace NSB
       StateEstimate m_nsb_state, m_received_nsb_state;
 
       double m_lat0, m_lon0;
+      double m_path_lat, m_path_lon;
 
       int m_transmission_limit, m_transmission_counter;
 
@@ -80,7 +81,7 @@ namespace NSB
       CircularBuffer<bool> m_msg_processed;
       Math::Random::MT19937 m_rng;
 
-      bool is_initialized, m_active, m_has_obstacle;
+      bool is_initialized, m_active, m_has_obstacle, has_estate;
 
       //! Constructor.
       //! @param[in] name task name.
@@ -96,18 +97,16 @@ namespace NSB
         bind<IMC::EstimatedState>(this);
         bind<IMC::DesiredLinearState>(this);
         bind<IMC::NSBMsg>(this);
-        bind<IMC::Obstacle>(this);
+        bind<IMC::Target>(this);
 
         m_params.los = &m_los;
         m_params.path = &m_path;
         m_params.oa = &m_obs_avoid;
 
-        param("Ellipse -- Origin x", m_path.m_x_center)
-          .defaultValue("0")
-          .description("x-coordinate of the center of the ellipse");
-        param("Ellipse -- Origin y", m_path.m_y_center)
-          .defaultValue("0")
-          .description("y-coordinate of the center of the ellipse");
+        param("Ellipse -- Origin Latitude", m_path_lat)
+          .defaultValue("0.71881387");
+        param("Ellipse -- Origin Longitude", m_path_lon)
+          .defaultValue("-0.15195186");
         param("Ellipse -- Depth", m_path.m_z_center)
           .defaultValue("0.")
           .description("Depth of the center of the ellipse");
@@ -217,6 +216,7 @@ namespace NSB
         param("Active", m_active)
           .defaultValue("false");
 
+        has_estate = false;
         reset();
       }
 
@@ -234,6 +234,15 @@ namespace NSB
 
         m_msg_buffer.clear();
         m_msg_processed.clear();
+      }
+
+      inline void
+      updatePathOrigin(void)
+      {
+        if (has_estate)
+        {
+          WGS84::displacement(m_lat0, m_lon0, 0., m_path_lat, m_path_lon, 0., &m_path.m_x_center, &m_path.m_y_center);       
+        }
       }
 
       void
@@ -256,6 +265,10 @@ namespace NSB
           m_params.p_form.y = m_form_shape[1];
           m_params.p_form.z = m_form_shape[2];
         }
+        if (paramChanged(m_path_lat) || paramChanged(m_path_lon))
+        {
+          updatePathOrigin();
+        }
       }
 
       //! Check if the conditions hold, and dispatch an NSB message if necessary
@@ -267,7 +280,7 @@ namespace NSB
         {
           m_transmission_counter++;
           m_next_transmission = time_now + m_next_period;
-          convert(m_nsb_state, m_nsb_msg);
+          convert(m_nsb_state, m_nsb_msg, m_lat0, m_lon0);
           dispatch(m_nsb_msg);
         }
       }
@@ -287,6 +300,11 @@ namespace NSB
       {
         m_lat0 = msg->lat;
         m_lon0 = msg->lon;
+        if (!has_estate)
+        {
+          has_estate = true;
+          updatePathOrigin();
+        }
         m_current_timestamp = Clock::getSinceEpoch();
 
         if (m_active)
@@ -348,7 +366,7 @@ namespace NSB
 
             m_transmission_counter = 0;
 
-            convert(msg, m_received_nsb_state);
+            convert(msg, m_received_nsb_state, m_lat0, m_lon0);
             if (msg.getTimeStamp() < m_current_timestamp) // check if we need to forward-simulate the estimate
             {
               if (m_has_obstacle)
@@ -403,7 +421,7 @@ namespace NSB
       }
 
       void
-      consume(const IMC::Obstacle* msg)
+      consume(const IMC::Target* msg)
       {
         m_obs_est.update(msg, m_lat0, m_lon0);
         m_has_obstacle = true;
