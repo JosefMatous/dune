@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 4f8aad95e953ecebe938758339b0b1bf                            *
+// IMC XML MD5: 70dadb3410c39c92824c33e3fe3eb09e                            *
 //***************************************************************************
 
 // ISO C++ 98 headers.
@@ -28238,6 +28238,74 @@ namespace DUNE
       IMC::toJSON(os__, "z", z, nindent__);
       IMC::toJSON(os__, "r_f", r_f, nindent__);
       IMC::toJSON(os__, "p", p, nindent__);
+    }
+
+    ExperimentControl::ExperimentControl(void)
+    {
+      m_header.mgid = 2024;
+      clear();
+    }
+
+    void
+    ExperimentControl::clear(void)
+    {
+      op = 0;
+      experiment = 0;
+      obstacle = 0;
+    }
+
+    bool
+    ExperimentControl::fieldsEqual(const Message& msg__) const
+    {
+      const IMC::ExperimentControl& other__ = static_cast<const ExperimentControl&>(msg__);
+      if (op != other__.op) return false;
+      if (experiment != other__.experiment) return false;
+      if (obstacle != other__.obstacle) return false;
+      return true;
+    }
+
+    int
+    ExperimentControl::validate(void) const
+    {
+      return true;
+    }
+
+    uint8_t*
+    ExperimentControl::serializeFields(uint8_t* bfr__) const
+    {
+      uint8_t* ptr__ = bfr__;
+      ptr__ += IMC::serialize(op, ptr__);
+      ptr__ += IMC::serialize(experiment, ptr__);
+      ptr__ += IMC::serialize(obstacle, ptr__);
+      return ptr__;
+    }
+
+    uint16_t
+    ExperimentControl::deserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      const uint8_t* start__ = bfr__;
+      bfr__ += IMC::deserialize(op, bfr__, size__);
+      bfr__ += IMC::deserialize(experiment, bfr__, size__);
+      bfr__ += IMC::deserialize(obstacle, bfr__, size__);
+      return bfr__ - start__;
+    }
+
+    uint16_t
+    ExperimentControl::reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      const uint8_t* start__ = bfr__;
+      bfr__ += IMC::deserialize(op, bfr__, size__);
+      bfr__ += IMC::deserialize(experiment, bfr__, size__);
+      bfr__ += IMC::deserialize(obstacle, bfr__, size__);
+      return bfr__ - start__;
+    }
+
+    void
+    ExperimentControl::fieldsToJSON(std::ostream& os__, unsigned nindent__) const
+    {
+      IMC::toJSON(os__, "op", op, nindent__);
+      IMC::toJSON(os__, "experiment", experiment, nindent__);
+      IMC::toJSON(os__, "obstacle", obstacle, nindent__);
     }
   }
 }

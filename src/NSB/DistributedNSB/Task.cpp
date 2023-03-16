@@ -73,6 +73,7 @@ namespace NSB
       bool is_initialized, has_estate;
 
       double m_T_start, m_T_stop, m_param_stop;
+      IMC::ExperimentControl m_stop_experiment;
 
       //! Constructor.
       //! @param[in] name task name.
@@ -86,12 +87,17 @@ namespace NSB
         bind<IMC::EstimatedState>(this);
         bind<IMC::NSBState>(this);
         bind<IMC::Target>(this);
+        bind<IMC::ExperimentControl>(this);
 
         m_linstate.flags = IMC::DesiredLinearState::FL_VX | IMC::DesiredLinearState::FL_VY | IMC::DesiredLinearState::FL_VZ;
 
         m_T_start = -1.;
         is_initialized = false;
         has_estate = false;
+
+        m_stop_experiment.op = ExperimentControl::OP_STOP;
+        m_stop_experiment.experiment = ExperimentControl::EX_NSB;
+        m_stop_experiment.obstacle = IMC::BOOL_TRUE;
 
         param("Ellipse -- Origin Latitude", m_path_lat)
           .defaultValue("0.71881387");
@@ -212,6 +218,15 @@ namespace NSB
         }
       }
 
+      inline void
+      onActiveChanged(void)
+      {
+        if (m_active)
+          requestActivation();
+        else
+          requestDeactivation();
+      }
+
       void
       onUpdateParameters(void)
       {
@@ -222,10 +237,7 @@ namespace NSB
         }
         if (paramChanged(m_active))
         {
-          if (m_active)
-            requestActivation();
-          else
-            requestDeactivation();
+          onActiveChanged();
         }
         if (paramChanged(m_form_shape))
         {
@@ -261,6 +273,17 @@ namespace NSB
         m_T_start = -1.;
         is_initialized = false;
         m_has_obstacle = false;
+      }
+
+      void
+      consume(const IMC::ExperimentControl* msg)
+      {
+        bool new_active = (msg->op == ExperimentControl::OP_START && msg->experiment == ExperimentControl::EX_NSB);
+        if (new_active != m_active)
+        {
+          m_active = new_active;
+          onActiveChanged();
+        }
       }
 
       void
@@ -343,6 +366,7 @@ namespace NSB
               debug("Reached experiment termination time.");
               m_active = false;
               requestDeactivation();
+              dispatch(m_stop_experiment);
             }            
           }
           if (m_param_stop > 0.) // check for parameter-based termination
@@ -352,6 +376,7 @@ namespace NSB
               debug("Reached experiment termination parameter.");
               m_active = false;
               requestDeactivation();
+              dispatch(m_stop_experiment);
             }
           }
         }

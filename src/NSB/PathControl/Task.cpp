@@ -103,6 +103,7 @@ namespace NSB
         DUNE::Control::PathController(name, ctx)
       {
         bind<IMC::DesiredLinearState>(this);
+        bind<IMC::ExperimentControl>(this);
 
         param("Horizontal PID Gains", m_params.horizontal_gains)
           .defaultValue("0.35, 0.02, 0")
@@ -252,6 +253,12 @@ namespace NSB
       {
         m_horizontal_pid.reset();
         vertical_reset();
+      }
+
+      void
+      consume(const IMC::ExperimentControl* msg)
+      {
+        m_active = (msg->op == ExperimentControl::OP_START);
       }
 
       void

@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 4f8aad95e953ecebe938758339b0b1bf                            *
+// IMC XML MD5: 70dadb3410c39c92824c33e3fe3eb09e                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_MACROS_HPP_INCLUDED_
@@ -694,5 +694,7 @@
 #define DUNE_IMC_NSBMSG 2022
 //! NSBState identification number.
 #define DUNE_IMC_NSBSTATE 2023
+//! ExperimentControl identification number.
+#define DUNE_IMC_EXPERIMENTCONTROL 2024
 
 #endif

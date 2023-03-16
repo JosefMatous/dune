@@ -98,6 +98,7 @@ namespace NSB
         bind<IMC::DesiredLinearState>(this);
         bind<IMC::NSBMsg>(this);
         bind<IMC::Target>(this);
+        bind<IMC::ExperimentControl>(this);
 
         m_params.los = &m_los;
         m_params.path = &m_path;
@@ -293,6 +294,17 @@ namespace NSB
         m_p_hat.z = msg->depth;
         m_last_linstate.reset();
         m_linstate_counter = 0;
+      }
+
+      void
+      consume(const IMC::ExperimentControl* msg)
+      {
+        bool new_active = (msg->op == ExperimentControl::OP_START && msg->experiment == ExperimentControl::EX_NSB);
+        if (new_active != m_active)
+        {
+          m_active = new_active;
+          reset();
+        }
       }
 
       void

@@ -148,7 +148,8 @@ main(int argc, char** argv)
       fprintf(stdout, "  [C]: CacheControl, Calibration, ClockControl, ControlLoops\n");
       fprintf(stdout, "  [D]: DataSanity, DesiredControl, DesiredHeading, DesiredHeadingRate, DesiredPitch,\n");
       fprintf(stdout, "       DesiredSpeed, DesiredRoll, DesiredZ, DevCalibrationControl, DevDataText\n");
-      fprintf(stdout, "  [E]: EmergencyControl, EntityList, EntityState, EntityActivationState, EstimatedState\n");
+      fprintf(stdout, "  [E]: EmergencyControl, EntityList, EntityState, EntityActivationState, EstimatedState,\n");
+      fprintf(stdout, "       ExperimentControl\n");
       fprintf(stdout, "  [F]: FuelLevel\n");
       fprintf(stdout, "  [G]: GpsFix, GpsFixRtk\n");
       fprintf(stdout, "  [H]: Heartbeat\n");
@@ -413,6 +414,31 @@ main(int argc, char** argv)
     tmsg->lat = 0.0;
     tmsg->lon = 0.0;
     tmsg->depth = 0.0;
+  }
+
+  if (strcmp(argv[3], "ExperimentControl") == 0)
+  {
+    IMC::ExperimentControl* tmsg = new IMC::ExperimentControl;
+    msg = tmsg;
+    if (strcmp(argv[4], "start") == 0)
+      tmsg->op = ExperimentControl::OP_START;
+    else
+      tmsg->op = ExperimentControl::OP_STOP;
+    if (strcmp(argv[5], "path_following") == 0)
+      tmsg->experiment = ExperimentControl::EX_PATH_FOLLOWING;
+    else
+      tmsg->experiment = ExperimentControl::EX_NSB;
+    if (argc == 7)
+    {
+    if (strcmp(argv[6], "true") == 0)
+      tmsg->obstacle = IMC::BOOL_TRUE;
+    else
+      tmsg->obstacle = IMC::BOOL_FALSE;
+    }
+    else
+    {
+      tmsg->obstacle = IMC::BOOL_FALSE;
+    }
   }
 
   if (strcmp(argv[3], "FuelLevel") == 0)

@@ -69,6 +69,8 @@ namespace NSB
       Task(const std::string& name, Tasks::Context& ctx):
         DUNE::Tasks::Periodic(name, ctx)
       {
+        bind<IMC::ExperimentControl>(this);
+
         param("Initial Latitude", m_params.lat0)
           .defaultValue("0.7188139"); 
         param("Initial Longitude", m_params.lon0)
@@ -105,6 +107,17 @@ namespace NSB
         m_y = 0.;
         m_delta.reset();
         debug("Obstacle reset");
+      }
+
+      void
+      consume(const IMC::ExperimentControl* msg)
+      {
+        bool new_active = (msg->op == ExperimentControl::OP_START && msg->obstacle == IMC::BOOL_TRUE);
+        if (new_active != m_active)
+        {
+          m_active = new_active;
+          reset();
+        }
       }
 
       //! Main loop.

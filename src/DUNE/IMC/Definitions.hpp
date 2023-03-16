@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 4f8aad95e953ecebe938758339b0b1bf                            *
+// IMC XML MD5: 70dadb3410c39c92824c33e3fe3eb09e                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_DEFINITIONS_HPP_INCLUDED_
@@ -26699,6 +26699,89 @@ namespace DUNE
       getFixedSerializationSize(void) const
       {
         return 24;
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! Experiment Control.
+    class ExperimentControl: public Message
+    {
+    public:
+      //! Operation.
+      enum OperationEnum
+      {
+        //! Stop.
+        OP_STOP = 0,
+        //! Start.
+        OP_START = 1
+      };
+
+      //! Experiment.
+      enum ExperimentEnum
+      {
+        //! Curved Path Following.
+        EX_PATH_FOLLOWING = 0,
+        //! Distributed NSB.
+        EX_NSB = 1
+      };
+
+      //! Operation.
+      uint8_t op;
+      //! Experiment.
+      uint8_t experiment;
+      //! Activate Obstacle.
+      uint8_t obstacle;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 2024;
+      }
+
+      ExperimentControl(void);
+
+      ExperimentControl*
+      clone(void) const
+      {
+        return new ExperimentControl(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return ExperimentControl::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "ExperimentControl";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 3;
       }
 
       void
