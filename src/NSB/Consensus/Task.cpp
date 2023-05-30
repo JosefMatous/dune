@@ -36,6 +36,7 @@
 #include "../ObstacleEstimator.hpp"
 #include "../FormationKeeping.hpp"
 #include "../Utilities.hpp"
+#include "../Parameters.hpp"
 #include "NSBSimulator.hpp"
 #include "NSBConsensus.hpp"
 #include "Utilities.hpp"
@@ -56,17 +57,21 @@ namespace NSB
       LineOfSight m_los;
       ObstacleAvoidance m_obs_avoid;
       ObstacleEstimator m_obs_est;
-      FormationKeepingSaturated m_form;
       EstimatorParameters m_params;
       Delta m_last_step, m_last_linstate;
-      std::vector<double> m_form_shape;
+      std::map<uint16_t, double> m_clock_offset;
 
       IMC::NSBMsg m_nsb_msg;   // consensus message (sent to others)
       IMC::NSBState m_nsb_est; // state message (sent to self)
       StateEstimate m_nsb_state, m_received_nsb_state;
 
+      IMC::AcousticOperation m_ac_op; // for sending the consensus messages via acoustics
+      std::string m_ac_dest_name;
+      uint16_t m_ac_dest_id;
+
+      IMC::NSBParametersRequest m_nsb_request;
+
       double m_lat0, m_lon0;
-      double m_path_lat, m_path_lon;
 
       int m_transmission_limit, m_transmission_counter;
 
@@ -75,6 +80,8 @@ namespace NSB
 
       double m_current_timestamp;
       double m_next_transmission, m_next_period;
+      double m_next_transmission_uw, m_next_period_uw;
+      float m_z, m_z_uw_threshold;
 
       double m_delay, m_loss;
       CircularBuffer<IMC::NSBMsg> m_msg_buffer;
@@ -90,7 +97,6 @@ namespace NSB
         DUNE::Tasks::Task(name, ctx),
         m_path(0, 0, 0., 50., 30., 0., 0., 0., false, M_PI_2, 0.),
         m_los(15., false, 1.3, 0.5),
-        m_form(0., 0., 0., 0.25, 0.5),
         m_msg_buffer(8),
         m_msg_processed(8)
       {
@@ -99,85 +105,12 @@ namespace NSB
         bind<IMC::NSBMsg>(this);
         bind<IMC::Target>(this);
         bind<IMC::ExperimentControl>(this);
+        bind<IMC::NSBParameters>(this);
+        bind<IMC::ClockOffset>(this);
 
         m_params.los = &m_los;
         m_params.path = &m_path;
         m_params.oa = &m_obs_avoid;
-
-        param("Ellipse -- Origin Latitude", m_path_lat)
-          .defaultValue("0.71881387");
-        param("Ellipse -- Origin Longitude", m_path_lon)
-          .defaultValue("-0.15195186");
-        param("Ellipse -- Depth", m_path.m_z_center)
-          .defaultValue("0.")
-          .description("Depth of the center of the ellipse");
-        param("Ellipse -- Semimajor Axis", m_path.m_a)
-          .defaultValue("60.")
-          .minimumValue("10.")
-          .maximumValue("1000.")
-          .description("Semimajor axis of the ellipse");
-        param("Ellipse -- Semiminor Axis", m_path.m_b)
-          .defaultValue("40.")
-          .minimumValue("10.")
-          .maximumValue("1000.")
-          .description("Semiminor axis of the ellipse");
-        param("Ellipse -- Z Amplitude", m_path.m_c)
-          .defaultValue("0.")
-          .minimumValue("0.")
-          .maximumValue("100.")
-          .description("Amplitude of oscillations in the z-axis");
-        param("Ellipse -- Clockwise", m_path.m_clockwise)
-          .defaultValue("true")
-          .description("True if the path goes clockwise; false if anticlockwise");
-        param("Ellipse -- Orientation", m_path.m_psi)
-          .defaultValue("0")
-          .description("Orientation (yaw angle) of the ellipse. Zero means semimajor axis facing north");
-        param("Ellipse -- Z Frequency", m_path.m_z_freq)
-          .defaultValue("0.")
-          .description("Frequency of oscillations in the z-axis");
-        param("Ellipse -- Initial Phase", m_path.m_phi0)
-          .defaultValue("0.")
-          .description("Initial phase of the ellipse");
-        param("Ellipse -- Z Initial Phase", m_path.m_z_phi0)
-          .defaultValue("0.")
-          .description("Initial phase of oscillations in the z-axis");
-
-        param("LOS -- Lookahead Distance", m_los.m_lookahead)
-          .defaultValue("15.")
-          .minimumValue("1.")
-          .maximumValue("100.")
-          .description("Lookahead distance of the LOS algorithm");
-        param("LOS -- Adaptive", m_los.m_adaptive)
-          .defaultValue("true")
-          .description("True if using adaptive lookahead distance");
-        param("LOS -- Speed", m_los.m_speed)
-          .defaultValue("1.3")
-          .minimumValue("0.5")
-          .maximumValue("2.")
-          .description("Path following speed");
-        param("LOS -- Gain", m_los.m_parameter_gain)
-          .defaultValue("0.5")
-          .minimumValue("0.1")
-          .maximumValue("2.")
-          .description("Path parameter update gain");
-
-        param("Formation Keeping -- Shape", m_form_shape)
-          .defaultValue("0., 0., 0.")
-          .size(3)
-          .description("Position of the vehicle within the formation");
-
-        param("Obstacle Avoidance -- Minimum Cone Angle", m_obs_avoid.m_cone_min)
-          .defaultValue("5")
-          .minimumValue("1")
-          .maximumValue("30");
-        param("Obstacle Avoidance -- Radius", m_obs_avoid.m_obstacle_radius)
-          .defaultValue("5")
-          .minimumValue("1")
-          .maximumValue("30");
-        param("Obstacle Avoidance -- Hysteresis", m_obs_avoid.m_hysteresis)
-          .defaultValue("3")
-          .minimumValue("0")
-          .maximumValue("10");
 
         param("Initial Covariance", m_params.P0)
           .minimumValue("0.000001")
@@ -192,9 +125,19 @@ namespace NSB
         param("Minimum Comm Period", m_params.T_min)
           .defaultValue("5")
           .minimumValue("1");
+        param("Minimum Comm Period Underwater", m_params.T_min_uw)
+          .defaultValue("30")
+          .minimumValue("1");
         param("Maximum Comm Period", m_params.T_max)
           .defaultValue("90")
           .minimumValue("10");
+        param("Underwater Depth Threshold", m_z_uw_threshold)
+          .defaultValue("0.5")
+          .minimumValue("0")
+          .description("Switch to underwater communication mode if vehicle depth exceeds the given threshold.");
+        param("Acoustic Operation System", m_ac_dest_name)
+          .defaultValue("lauv-thor")
+          .description("Name of the system that is connected to the acoustic modem.");
         param("Maximum Number of Consecutive Transmissions", m_transmission_limit)
           .defaultValue("2");
         param("Position Update -- Gain", m_params.k_self)
@@ -221,6 +164,28 @@ namespace NSB
         reset();
       }
 
+      inline void
+      debugExternalParameters(void)
+      {
+        debug("Ellipse -- Origin [%.2f, %.2f, %.2f]", m_path.m_x_center, m_path.m_y_center, m_path.m_z_center);
+        debug("Ellipse -- Axes   [%.2f, %.2f, %.2f]", m_path.m_a, m_path.m_b, m_path.m_c);
+        debug("Ellipse -- Clockwise %u", m_path.m_clockwise);
+        debug("Ellipse -- Orientation %.3f", m_path.m_psi);
+        debug("Ellipse -- Frequency %.1f", m_path.m_z_freq);
+        debug("Ellipse -- Initial Phases [%.3f, %.3f]", m_path.m_phi0, m_path.m_z_phi0);
+
+        debug("LOS -- Lookahead Distance %f", m_los.m_lookahead);
+        debug("LOS -- Speed %f", m_los.m_speed);
+        debug("LOS -- Adaptive %u", m_los.m_adaptive);
+        debug("LOS -- Gain %f", m_los.m_parameter_gain);
+
+        debug("Formation Keeping -- Shape [%.2f, %.2f, %.2f]", m_params.p_form.x, m_params.p_form.y, m_params.p_form.z);
+
+        debug("Obstacle Avoidance -- Minimum Cone Angle %.1f", Angles::degrees(m_obs_avoid.m_cone_min));
+        debug("Obstacle Avoidance -- Radius %.1f", m_obs_avoid.m_obstacle_radius);
+        debug("Obstacle Avoidance -- Hysteresis %.1f", Angles::degrees(m_obs_avoid.m_hysteresis));
+      }
+
       void
       reset(void)
       {
@@ -232,44 +197,18 @@ namespace NSB
         m_has_obstacle = false;
         m_next_transmission = 0.;
         m_next_period = m_params.T_min;
+        m_next_transmission_uw = 0.;
+        m_next_period_uw = m_params.T_min_uw;
 
         m_msg_buffer.clear();
         m_msg_processed.clear();
       }
 
-      inline void
-      updatePathOrigin(void)
-      {
-        if (has_estate)
-        {
-          WGS84::displacement(m_lat0, m_lon0, 0., m_path_lat, m_path_lon, 0., &m_path.m_x_center, &m_path.m_y_center);       
-        }
-      }
-
       void
       onUpdateParameters(void)
       {
-        if (paramChanged(m_active))
-          reset();
-
-        if (paramChanged(m_obs_avoid.m_cone_min))
-        {
-          m_obs_avoid.m_cone_min = Angles::radians(m_obs_avoid.m_cone_min);
-        }
-        if (paramChanged(m_obs_avoid.m_hysteresis))
-        {
-          m_obs_avoid.m_hysteresis = Angles::radians(m_obs_avoid.m_hysteresis);
-        }
-        if (paramChanged(m_form_shape))
-        {
-          m_params.p_form.x = m_form_shape[0];
-          m_params.p_form.y = m_form_shape[1];
-          m_params.p_form.z = m_form_shape[2];
-        }
-        if (paramChanged(m_path_lat) || paramChanged(m_path_lon))
-        {
-          updatePathOrigin();
-        }
+        if (paramChanged(m_ac_dest_name))
+          m_ac_dest_id = m_ctx.resolver.resolve(m_ac_dest_name);
       }
 
       //! Check if the conditions hold, and dispatch an NSB message if necessary
@@ -277,12 +216,24 @@ namespace NSB
       dispatch_nsb_message(void)
       {
         double time_now = Clock::get();
-        if ((m_transmission_counter < m_transmission_limit) && (time_now >= m_next_transmission))
+        bool underwater = (m_z >= m_z_uw_threshold);
+        double next_transmission = underwater ? m_next_transmission_uw : m_next_transmission;
+        if ((m_transmission_counter < m_transmission_limit) && (time_now >= next_transmission))
         {
           m_transmission_counter++;
           m_next_transmission = time_now + m_next_period;
+          m_next_transmission_uw = time_now + m_next_period_uw;
           convert(m_nsb_state, m_nsb_msg, m_lat0, m_lon0);
           dispatch(m_nsb_msg);
+          if (underwater)
+          {
+            debug("Transmitting over acoustics");
+            m_ac_op.op = AcousticOperation::AOP_MSG;
+            m_ac_op.setDestination(m_ac_dest_id);
+            m_ac_op.msg.set(m_nsb_msg);
+            m_ac_op.system = "broadcast";
+            dispatch(m_ac_op);
+          }
         }
       }
 
@@ -297,13 +248,45 @@ namespace NSB
       }
 
       void
+      consume(const IMC::NSBParameters* msg)
+      {
+        if (has_estate)
+          updatePathParameters(msg, m_path, m_lat0, m_lon0);
+        updateLosParameters(msg, m_los);
+        updateFormationShape(msg, m_params.p_form);
+        updateObstacleAvoidance(msg, m_obs_avoid);
+
+        //debugExternalParameters();        
+      }
+
+      void
+      consume(const IMC::ClockOffset* msg)
+      {
+        std::map<uint16_t, double>::iterator search = m_clock_offset.find(msg->system);
+        if (search != m_clock_offset.end())
+        {
+          //debug("Updating clock offset entry for %s", m_ctx.resolver.resolve(msg->system));
+          search->second = msg->offset;
+        }
+        else
+        {
+          //debug("Creating clock offset entry for %s", m_ctx.resolver.resolve(msg->system));
+          m_clock_offset.insert({msg->system, msg->offset});
+        }
+        //debug("Clock offset is %g seconds", msg->offset);
+      }
+
+      void
       consume(const IMC::ExperimentControl* msg)
       {
-        bool new_active = (msg->op == ExperimentControl::OP_START && msg->experiment == ExperimentControl::EX_NSB);
-        if (new_active != m_active)
+        if (msg->delay <= 0.)
         {
-          m_active = new_active;
-          reset();
+          bool new_active = (msg->op == ExperimentControl::OP_START && msg->experiment == ExperimentControl::EX_NSB);
+          if (new_active != m_active)
+          {
+            m_active = new_active;
+            reset();
+          }
         }
       }
 
@@ -312,10 +295,11 @@ namespace NSB
       {
         m_lat0 = msg->lat;
         m_lon0 = msg->lon;
+        m_z = msg->depth;
         if (!has_estate)
         {
           has_estate = true;
-          updatePathOrigin();
+          dispatch(m_nsb_request);
         }
         m_current_timestamp = Clock::getSinceEpoch();
 
@@ -379,22 +363,31 @@ namespace NSB
             m_transmission_counter = 0;
 
             convert(msg, m_received_nsb_state, m_lat0, m_lon0);
-            if (msg.getTimeStamp() < m_current_timestamp) // check if we need to forward-simulate the estimate
+            std::map<uint16_t, double>::iterator search = m_clock_offset.find(msg.getSource());
+            if (search != m_clock_offset.end())
             {
-              if (m_has_obstacle)
+              double adjusted_timestamp = msg.getTimeStamp() + search->second;
+              if (adjusted_timestamp < m_current_timestamp) // check if we need to forward-simulate the estimate
               {
-                ObstacleAvoidance obs_avoid_copy(m_obs_avoid); // use a copy of the obstacle avoidance class
-                m_params.oa = &obs_avoid_copy;
-                nsb_simulator_run(m_params, m_obs_est, m_received_nsb_state, msg.getTimeStamp(), m_current_timestamp, 0.1);
-                m_params.oa = &m_obs_avoid;
-              }
-              else
-              {
-                nsb_simulator_run(m_params, m_received_nsb_state, msg.getTimeStamp(), m_current_timestamp, 0.1);
+                if (m_has_obstacle)
+                {
+                  ObstacleAvoidance obs_avoid_copy(m_obs_avoid); // use a copy of the obstacle avoidance class
+                  m_params.oa = &obs_avoid_copy;
+                  nsb_simulator_run(m_params, m_obs_est, m_received_nsb_state, adjusted_timestamp, m_current_timestamp, 0.1);
+                  m_params.oa = &m_obs_avoid;
+                }
+                else
+                {
+                  nsb_simulator_run(m_params, m_received_nsb_state, adjusted_timestamp, m_current_timestamp, 0.1);
+                }
               }
             }
-            m_next_period = update_comm_period(m_nsb_state, m_received_nsb_state, m_params);
-            debug("Comm period set to %.1f seconds", m_next_period);
+            else
+            {
+              war("Could not find clock shift for %s", m_ctx.resolver.resolve(msg.getSource()));
+            }
+            update_comm_period(m_nsb_state, m_received_nsb_state, m_params, m_next_period, m_next_period_uw);
+            debug("Comm period set to %.1f seconds on the surface, %.1f seconds underwater", m_next_period, m_next_period_uw);
             consensus_algorithm(m_nsb_state, m_received_nsb_state);
           }
           else

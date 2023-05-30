@@ -34,6 +34,7 @@
 #include "../LineOfSight.hpp"
 #include "../ObstacleAvoidance.hpp"
 #include "../ObstacleEstimator.hpp"
+#include "../Parameters.hpp"
 #include "../Utilities.hpp"
 
 namespace NSB
@@ -56,6 +57,7 @@ namespace NSB
       Delta m_last_step;
 
       IMC::DesiredLinearState m_linstate;
+      IMC::NSBParametersRequest m_nsb_request;
 
       // External activation
       bool m_active;
@@ -74,6 +76,7 @@ namespace NSB
         bind<IMC::EstimatedState>(this);
         bind<IMC::Target>(this);
         bind<IMC::ExperimentControl>(this);
+        bind<IMC::NSBParameters>(this);
 
         m_path = Ellipse(0, 0, 0., 50., 30., 0., -0.6585325752983525, 0., false, M_PI_2, 0.);
         m_los = LineOfSight(15., false, 1.3, 0.5);
@@ -84,76 +87,7 @@ namespace NSB
         m_stop_experiment.op = ExperimentControl::OP_STOP;
         m_stop_experiment.experiment = ExperimentControl::EX_NSB;
         m_stop_experiment.obstacle = IMC::BOOL_TRUE;
-
-        param("Ellipse -- Origin Latitude", m_path_lat)
-          .defaultValue("0.71881387");
-        param("Ellipse -- Origin Longitude", m_path_lon)
-          .defaultValue("-0.15195186");
-        param("Ellipse -- Depth", m_path.m_z_center)
-          .defaultValue("0.")
-          .description("Depth of the center of the ellipse");
-        param("Ellipse -- Semimajor Axis", m_path.m_a)
-          .defaultValue("50.")
-          .minimumValue("10.")
-          .maximumValue("100.")
-          .description("Semimajor axis of the ellipse");
-        param("Ellipse -- Semiminor Axis", m_path.m_b)
-          .defaultValue("30.")
-          .minimumValue("10.")
-          .maximumValue("100.")
-          .description("Semiminor axis of the ellipse");
-        param("Ellipse -- Z Amplitude", m_path.m_c)
-          .defaultValue("0.")
-          .minimumValue("0.")
-          .maximumValue("10.")
-          .description("Amplitude of oscillations in the z-axis");
-        param("Ellipse -- Clockwise", m_path.m_clockwise)
-          .defaultValue("true")
-          .description("True if the path goes clockwise; false if anticlockwise");
-        param("Ellipse -- Orientation", m_path.m_psi)
-          .defaultValue("0")
-          .description("Orientation (yaw angle) of the ellipse. Zero means semimajor axis facing north");
-        param("Ellipse -- Z Frequency", m_path.m_z_freq)
-          .defaultValue("0.")
-          .description("Frequency of oscillations in the z-axis");
-        param("Ellipse -- Initial Phase", m_path.m_phi0)
-          .defaultValue("0.")
-          .description("Initial phase of the ellipse");
-        param("Ellipse -- Z Initial Phase", m_path.m_z_phi0)
-          .defaultValue("0.")
-          .description("Initial phase of oscillations in the z-axis");
-
-        param("LOS -- Lookahead Distance", m_los.m_lookahead)
-          .defaultValue("15.")
-          .minimumValue("1.")
-          .maximumValue("100.")
-          .description("Lookahead distance of the LOS algorithm");
-        param("LOS -- Adaptive", m_los.m_adaptive)
-          .defaultValue("true")
-          .description("True if using adaptive lookahead distance");
-        param("LOS -- Speed", m_los.m_speed)
-          .defaultValue("1.3")
-          .minimumValue("0.5")
-          .maximumValue("2.")
-          .description("Path following speed");
-        param("LOS -- Gain", m_los.m_parameter_gain)
-          .defaultValue("0.5")
-          .minimumValue("0.1")
-          .maximumValue("2.")
-          .description("Path parameter update gain");
-
-        param("Obstacle Avoidance -- Minimum Cone Angle", m_obs_avoid.m_cone_min)
-          .defaultValue("5")
-          .minimumValue("1")
-          .maximumValue("30");
-        param("Obstacle Avoidance -- Radius", m_obs_avoid.m_obstacle_radius)
-          .defaultValue("5")
-          .minimumValue("1")
-          .maximumValue("30");
-        param("Obstacle Avoidance -- Hysteresis", m_obs_avoid.m_hysteresis)
-          .defaultValue("3")
-          .minimumValue("0")
-          .maximumValue("10");
+        m_stop_experiment.delay = 0.;
 
         param("Active", m_active)
           .defaultValue("false");
@@ -184,15 +118,6 @@ namespace NSB
       }
 
       inline void
-      updatePathOrigin(void)
-      {
-        if (is_initialized)
-        {
-          WGS84::displacement(m_lat0, m_lon0, 0., m_path_lat, m_path_lon, 0., &m_path.m_x_center, &m_path.m_y_center);       
-        }
-      }
-
-      inline void
       onActiveChanged(void)
       {
         if (m_active)
@@ -212,18 +137,6 @@ namespace NSB
         if (paramChanged(m_active))
         {
           onActiveChanged();
-        }
-        if (paramChanged(m_obs_avoid.m_cone_min))
-        {
-          m_obs_avoid.m_cone_min = Angles::radians(m_obs_avoid.m_cone_min);
-        }
-        if (paramChanged(m_obs_avoid.m_hysteresis))
-        {
-          m_obs_avoid.m_hysteresis = Angles::radians(m_obs_avoid.m_hysteresis);
-        }
-        if (paramChanged(m_path_lat) || paramChanged(m_path_lon))
-        {
-          updatePathOrigin();
         }
       }
 
@@ -246,12 +159,24 @@ namespace NSB
       void
       consume(const IMC::ExperimentControl* msg)
       {
-        bool new_active = (msg->op == ExperimentControl::OP_START && msg->experiment == ExperimentControl::EX_PATH_FOLLOWING);
-        if (new_active != m_active)
+        if (msg->delay <= 0.)
         {
-          m_active = new_active;
-          onActiveChanged();
+          bool new_active = (msg->op == ExperimentControl::OP_START && msg->experiment == ExperimentControl::EX_PATH_FOLLOWING);
+          if (new_active != m_active)
+          {
+            m_active = new_active;
+            onActiveChanged();
+          }
         }
+      }
+
+      void
+      consume(const IMC::NSBParameters* msg)
+      {
+        if (is_initialized)
+          updatePathParameters(msg, m_path, m_lat0, m_lon0);
+        updateLosParameters(msg, m_los);
+        updateObstacleAvoidance(msg, m_obs_avoid);
       }
 
       void
@@ -270,7 +195,7 @@ namespace NSB
         if (!is_initialized)
         {
           is_initialized = true;
-          updatePathOrigin();
+          dispatch(m_nsb_request);
         }
         if (isActive())
         {

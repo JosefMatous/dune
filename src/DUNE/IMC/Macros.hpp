@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 70dadb3410c39c92824c33e3fe3eb09e                            *
+// IMC XML MD5: db38089ebb053077c1fe78eda6b1439b                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_MACROS_HPP_INCLUDED_
@@ -696,5 +696,13 @@
 #define DUNE_IMC_NSBSTATE 2023
 //! ExperimentControl identification number.
 #define DUNE_IMC_EXPERIMENTCONTROL 2024
+//! NSBParameters identification number.
+#define DUNE_IMC_NSBPARAMETERS 2025
+//! NSBParametersRequest identification number.
+#define DUNE_IMC_NSBPARAMETERSREQUEST 2026
+//! ClockOffset identification number.
+#define DUNE_IMC_CLOCKOFFSET 2027
+//! ClockSync identification number.
+#define DUNE_IMC_CLOCKSYNC 2028
 
 #endif

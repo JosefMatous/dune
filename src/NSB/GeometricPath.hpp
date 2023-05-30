@@ -169,8 +169,8 @@ namespace NSB
           // Rotate by ellipse orientation
           double c_psi = std::cos(m_psi);
           double s_psi = std::sin(m_psi);
-          p.p.x = x0*c_psi - y0*s_psi;
-          p.p.y = y0*c_psi + x0*s_psi;
+          p.p.x = m_x_center + x0*c_psi - y0*s_psi;
+          p.p.y = m_y_center + y0*c_psi + x0*s_psi;
           double z_ned = m_z_center + z0;    
 
           // Calculate derivatives in x and y
@@ -185,7 +185,7 @@ namespace NSB
           p.p_ddiff.y = -y0*c_psi - x0*s_psi;
 
           // Derivatives in z
-          if ((z_ned > 0) && (m_c > 0))
+          if (z_ned > 0)
           {
             p.p.z = z_ned;
             p.p_diff.z = m_z_freq*m_c*std::cos(z_arg);

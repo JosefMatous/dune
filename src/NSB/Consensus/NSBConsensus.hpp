@@ -18,15 +18,16 @@ namespace NSB
   {
     using DUNE_NAMESPACES;
 
-    inline double
-    update_comm_period(const StateEstimate& own_state, const StateEstimate& recv_state, const EstimatorParameters& param)
+    inline void
+    update_comm_period(const StateEstimate& own_state, const StateEstimate& recv_state, const EstimatorParameters& param, double& period, double& period_uw)
     {
       double e = param.a_s * square(own_state.path_param - recv_state.path_param)
               + param.a_p * square(own_state.p_b.x - recv_state.p_b.x)
               + param.a_p * square(own_state.p_b.y - recv_state.p_b.y)
               + param.a_p * square(own_state.p_b.z - recv_state.p_b.z);
-      e = param.T_min + (param.T_max - param.T_min) * std::exp(-std::sqrt(e));
-      return e;
+      e = std::exp(-std::sqrt(e));
+      period = param.T_min + (param.T_max - param.T_min) * e;
+      period_uw = param.T_min_uw + (param.T_max - param.T_min_uw) * e;
     }
 
     inline void

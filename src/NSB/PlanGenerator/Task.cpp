@@ -36,6 +36,7 @@
 #include "../Utilities.hpp"
 #include "../ObstacleAvoidance.hpp"
 #include "../ObstacleEstimator.hpp"
+#include "../Parameters.hpp"
 
 namespace NSB
 {
@@ -52,7 +53,6 @@ namespace NSB
       Ellipse m_path;
       LineOfSight m_los;
       FormationKeepingSaturated m_form;
-      std::vector<double> m_form_shape;
 
       struct 
       {
@@ -71,8 +71,6 @@ namespace NSB
         std::vector<double> p_vehicle;
         std::vector<double> p_barycenter;
         bool use_obstacle;
-        std::vector<double> p_obstacle;
-        double psi_obs, u_obs;
         double delta_t;
         std::vector<double> waypoint_param;
         std::string plan_name;
@@ -84,12 +82,15 @@ namespace NSB
       ObstacleAvoidance m_obs_avoid;
 
       double m_lat0, m_lon0;
+      double m_lat_obs, m_lon_obs;
       bool is_plan_set, is_start_plan_set;
 
       uint16_t request_id, start_request_id;
 
       IMC::PlanControl m_pc, m_start_pc;
       IMC::PlanSpecification m_spec, m_start_spec;
+
+      IMC::NSBParametersRequest m_nsb_request;
 
       //! Constructor.
       //! @param[in] name task name.
@@ -100,7 +101,8 @@ namespace NSB
         m_los(15., false, 1.3, 0.5),
         m_form(0., 0., 0., 0.25, 0.5)
       {
-        bind<IMC::PlanControl>(this);
+        //bind<IMC::PlanControl>(this);
+        bind<IMC::NSBParameters>(this);
 
         is_plan_set = false;
         is_start_plan_set = false;
@@ -129,100 +131,34 @@ namespace NSB
           .defaultValue("0.7188233, -0.1519519, 0")
           .size(3)
           .description("Initial position of the barycenter (latitude, longitude, depth).");
-        param("Obstacle -- Active", m_params.use_obstacle)
-          .defaultValue("false");
-        param("Obstacle -- Initial Position", m_params.p_obstacle)
-          .defaultValue("0.71881387, -0.15195186");
-        param("Obstacle -- Speed", m_params.u_obs)
-          .defaultValue("0.6667");
-        param("Obstacle -- Course", m_params.psi_obs)
-          .defaultValue("1.57079632");
-
-        param("Ellipse -- Origin Latitude", m_lat0)
-          .defaultValue("0.71881387");
-        param("Ellipse -- Origin Longitude", m_lon0)
-          .defaultValue("-0.15195186");
-        param("Ellipse -- Depth", m_path.m_z_center)
-          .defaultValue("0.")
-          .description("Depth of the center of the ellipse");
-        param("Ellipse -- Semimajor Axis", m_path.m_a)
-          .defaultValue("60.")
-          .minimumValue("10.")
-          .maximumValue("1000.")
-          .description("Semimajor axis of the ellipse");
-        param("Ellipse -- Semiminor Axis", m_path.m_b)
-          .defaultValue("40.")
-          .minimumValue("10.")
-          .maximumValue("1000.")
-          .description("Semiminor axis of the ellipse");
-        param("Ellipse -- Z Amplitude", m_path.m_c)
-          .defaultValue("0.")
-          .minimumValue("0.")
-          .maximumValue("100.")
-          .description("Amplitude of oscillations in the z-axis");
-        param("Ellipse -- Clockwise", m_path.m_clockwise)
-          .defaultValue("true")
-          .description("True if the path goes clockwise; false if anticlockwise");
-        param("Ellipse -- Orientation", m_path.m_psi)
-          .defaultValue("0")
-          .description("Orientation (yaw angle) of the ellipse. Zero means semimajor axis facing north");
-        param("Ellipse -- Z Frequency", m_path.m_z_freq)
-          .defaultValue("0.")
-          .description("Frequency of oscillations in the z-axis");
-        param("Ellipse -- Initial Phase", m_path.m_phi0)
-          .defaultValue("0.")
-          .description("Initial phase of the ellipse");
-        param("Ellipse -- Z Initial Phase", m_path.m_z_phi0)
-          .defaultValue("0.")
-          .description("Initial phase of oscillations in the z-axis");
-
-        param("LOS -- Lookahead Distance", m_los.m_lookahead)
-          .defaultValue("15.")
-          .minimumValue("1.")
-          .maximumValue("100.")
-          .description("Lookahead distance of the LOS algorithm");
-        param("LOS -- Adaptive", m_los.m_adaptive)
-          .defaultValue("true")
-          .description("True if using adaptive lookahead distance");
-        param("LOS -- Speed", m_los.m_speed)
-          .defaultValue("1.3")
-          .minimumValue("0.5")
-          .maximumValue("2.")
-          .description("Path following speed");
-        param("LOS -- Gain", m_los.m_parameter_gain)
-          .defaultValue("0.5")
-          .minimumValue("0.1")
-          .maximumValue("2.")
-          .description("Path parameter update gain");
-
-        param("Formation Keeping -- Shape", m_form_shape)
-          .defaultValue("0., 0., 0.")
-          .size(3)
-          .description("Position of the vehicle within the formation");
-        param("Formation Keeping -- Gain", m_form.k_form)
-          .defaultValue("0.25")
-          .minimumValue("0.")
-          .description("Formation keeping task gain");
-        param("Formation Keeping -- Maximum Velocity", m_form.v_max)
-          .defaultValue("0.5")
-          .minimumValue("0.")
-          .description("Formation keeping velocity limit");
-
-        param("Obstacle Avoidance -- Minimum Cone Angle", m_obs_avoid.m_cone_min)
-          .defaultValue("5")
-          .minimumValue("1")
-          .maximumValue("30");
-        param("Obstacle Avoidance -- Radius", m_obs_avoid.m_obstacle_radius)
-          .defaultValue("5")
-          .minimumValue("1")
-          .maximumValue("30");
-        param("Obstacle Avoidance -- Hysteresis", m_obs_avoid.m_hysteresis)
-          .defaultValue("3")
-          .minimumValue("0")
-          .maximumValue("10");
+        param("Use Obstacle", m_params.use_obstacle)
+          .defaultValue("false")
+          .description("Set to true if the experiment includes obstacle avoidance");
 
         request_id = 0x0800U;
         start_request_id = 0x0900U;
+      }
+
+      inline void
+      debugExternalParameters(void)
+      {
+        debug("Ellipse -- Origin [%.2f, %.2f, %.2f]", m_path.m_x_center, m_path.m_y_center, m_path.m_z_center);
+        debug("Ellipse -- Axes   [%.2f, %.2f, %.2f]", m_path.m_a, m_path.m_b, m_path.m_c);
+        debug("Ellipse -- Clockwise %u", m_path.m_clockwise);
+        debug("Ellipse -- Orientation %.3f", m_path.m_psi);
+        debug("Ellipse -- Frequency %.1f", m_path.m_z_freq);
+        debug("Ellipse -- Initial Phases [%.3f, %.3f]", m_path.m_phi0, m_path.m_z_phi0);
+
+        debug("LOS -- Lookahead Distance %f", m_los.m_lookahead);
+        debug("LOS -- Speed %f", m_los.m_speed);
+        debug("LOS -- Adaptive %u", m_los.m_adaptive);
+        debug("LOS -- Gain %f", m_los.m_parameter_gain);
+
+        debug("Formation Keeping -- Shape [%.2f, %.2f, %.2f]", m_form.p_form.x, m_form.p_form.y, m_form.p_form.z);
+
+        debug("Obstacle Avoidance -- Minimum Cone Angle %.1f", Angles::degrees(m_obs_avoid.m_cone_min));
+        debug("Obstacle Avoidance -- Radius %.1f", m_obs_avoid.m_obstacle_radius);
+        debug("Obstacle Avoidance -- Hysteresis %.1f", Angles::degrees(m_obs_avoid.m_hysteresis));
       }
 
       inline void
@@ -239,7 +175,7 @@ namespace NSB
         m_nsb_state.path_param = 0.;
         WGS84::displacement(m_lat0, m_lon0, 0., m_params.p_barycenter[0], m_params.p_barycenter[1], 0., &m_nsb_state.x, &m_nsb_state.y);
         m_nsb_state.z = m_params.p_barycenter[2];
-        WGS84::displacement(m_lat0, m_lon0, 0., m_params.p_obstacle[0], m_params.p_obstacle[1], 0., &m_obstacle_state.x, &m_obstacle_state.y);
+        WGS84::displacement(m_lat0, m_lon0, 0., m_lat_obs, m_lon_obs, 0., &m_obstacle_state.x, &m_obstacle_state.y);
         m_obstacle_state.timestamp = 0.;
         updateFormationRadius();
       }
@@ -256,25 +192,6 @@ namespace NSB
       void
       onUpdateParameters(void)
       {
-        if (paramChanged(m_form_shape))
-        {
-          m_form.p_form.x = m_form_shape[0];
-          m_form.p_form.y = m_form_shape[1];
-          m_form.p_form.z = m_form_shape[2];
-        }
-        if (paramChanged(m_obs_avoid.m_cone_min))
-        {
-          m_obs_avoid.m_cone_min = Angles::radians(m_obs_avoid.m_cone_min);
-        }
-        if (paramChanged(m_obs_avoid.m_hysteresis))
-        {
-          m_obs_avoid.m_hysteresis = Angles::radians(m_obs_avoid.m_hysteresis);
-        }
-        if (paramChanged(m_params.u_obs) || paramChanged(m_params.psi_obs))
-        {
-          m_obstacle_state.vx = m_params.u_obs * std::cos(m_params.psi_obs);
-          m_obstacle_state.vy = m_params.u_obs * std::sin(m_params.psi_obs);
-        }
         if (paramChanged(m_params.plan_name))
         {
           m_params.start_plan_name = m_params.plan_name;
@@ -293,6 +210,26 @@ namespace NSB
       }
 
       void
+      consume(const IMC::NSBParameters* msg)
+      {
+        // Set the latitude and longitude of the desired path as the origin of the NED frame.
+        m_lat0 = msg->path_lat;
+        m_lon0 = msg->path_lon;
+        updatePathParameters(msg, m_path, m_lat0, m_lon0);
+        updateLosParameters(msg, m_los);
+        updateFormationKeeping(msg, m_form);
+        updateObstacleAvoidance(msg, m_obs_avoid);
+        // Update obstacle
+        m_lat_obs = msg->obs_lat;
+        m_lon_obs = msg->obs_lon;
+        m_obstacle_state.vx = msg->obs_vx;
+        m_obstacle_state.vy = msg->obs_vy;
+      
+        //debugExternalParameters();
+        reset();        
+      }
+
+/*      void
       consume(const IMC::PlanControl* msg)
       {
         bool is_relevant = (msg->getSource() == m_ctx.resolver.id())
@@ -328,13 +265,14 @@ namespace NSB
             is_start_plan_set = false;
           }
         }
-      }
+      }*/
 
       inline void
       simulator_step(double& t)
       {
         GeometricPath::PathReference path_ref;
         m_path.getPathReference(m_nsb_state.path_param, path_ref);
+        //debug("Path at [%.2f, %.2f, %.2f]", path_ref.x, path_ref.y, path_ref.z);
 
         Vector3D path_err;
         GeometricPath::getPathFollowingError(path_ref, m_nsb_state.x, m_nsb_state.y, m_nsb_state.z, path_err);
@@ -410,6 +348,39 @@ namespace NSB
       }
 
       inline void
+      add_station_keeping(unsigned i)
+      {
+        IMC::StationKeeping wp;
+        wp.lat = m_lat0;
+        wp.lon = m_lon0;
+        WGS84::displace(m_vehicle_state.x, m_vehicle_state.y, &wp.lat, &wp.lon);
+        wp.z = 0.;
+        wp.z_units = IMC::Z_DEPTH;
+        wp.speed = m_los.m_speed;
+        wp.speed_units = IMC::SUNITS_METERS_PS;
+        wp.radius = m_params.start_radius;
+
+        IMC::PlanManeuver pman;
+        pman.data.set(wp);
+        char buffer[15];
+        std::sprintf(buffer, "Goto%u", i);
+        pman.maneuver_id = buffer;
+
+        m_spec.maneuvers.push_back(pman);
+
+        if (i > 0)
+        {
+          IMC::PlanTransition tran;
+          tran.dest_man = buffer;
+          std::sprintf(buffer, "Goto%u", i-1);
+          tran.source_man = buffer;
+          tran.conditions = "ManeuverIsDone";
+
+          m_spec.transitions.push_back(tran);
+        }
+      }
+
+      inline void
       generate_plan(void)
       {
         m_spec.maneuvers.clear();
@@ -422,7 +393,10 @@ namespace NSB
           while (m_nsb_state.path_param < m_params.waypoint_param[i])
             simulator_step(t);
 
-          add_waypoint(i);
+          if (i < m_params.waypoint_param.size() - 1)
+            add_waypoint(i);
+          else
+            add_station_keeping(i);
         } 
         m_pc.type = IMC::PlanControl::PC_REQUEST;
         m_pc.op = IMC::PlanControl::PC_LOAD;
@@ -437,6 +411,7 @@ namespace NSB
 
         m_pc.arg.set(m_spec);
         dispatch(m_pc);
+        is_plan_set = true;
       }
 
       inline void
@@ -514,6 +489,7 @@ namespace NSB
 
         m_start_pc.arg.set(m_start_spec);
         dispatch(m_start_pc);
+        is_start_plan_set = true;
       }
 
       //! Main loop.

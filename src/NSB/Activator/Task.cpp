@@ -29,40 +29,23 @@
 
 // DUNE headers.
 #include <DUNE/DUNE.hpp>
-#include "../Utilities.hpp"
 
 namespace NSB
 {
-  //! Obstacle
+  //! Activator
   //!
-  //! Simulates an obstacle moving in a straight line.
-  //! Periodically publishes its location using the `Target` IMC message.
+  //! Handles delayed activation via the ExperimentControl message.
   //! @author Josef Matous
-  namespace Obstacle
+  namespace Activator
   {
     using DUNE_NAMESPACES;
 
 
     struct Task: public DUNE::Tasks::Periodic
     {
-      struct 
-      {
-        //! Initial latitude.
-        double lat0;
-        //! Initial longitude.
-        double lon0;
-        //! Velocity x.
-        float v_x;
-        //! Velocity y.
-        float v_y;
-      } m_params;
-
-      IMC::Target m_message;
-      IMC::NSBParametersRequest m_nsb_request;
-
-      bool m_active;
-      float m_x, m_y;
-      Delta m_delta;
+      IMC::ExperimentControl m_experiment_control;
+      bool m_is_waiting;
+      double m_transmission_time;
 
       //! Constructor.
       //! @param[in] name task name.
@@ -71,67 +54,28 @@ namespace NSB
         DUNE::Tasks::Periodic(name, ctx)
       {
         bind<IMC::ExperimentControl>(this);
-        bind<IMC::NSBParameters>(this);
 
-        param("Initial Latitude", m_params.lat0)
-          .defaultValue("0.7188139"); 
-        param("Initial Longitude", m_params.lon0)
-          .defaultValue("-0.1519519");
-        param("Velocity -- x", m_params.v_x)
-          .defaultValue("0");
-        param("Velocity -- y", m_params.v_y)
-          .defaultValue("0");
-        param("Active", m_active)
-          .defaultValue("false");
-
-        m_message.label = "obstacle";
-        
-        reset();
-      }
-
-      void
-      onUpdateParameters(void)
-      {
-        if (paramChanged(m_active))
-          reset();
-      }
-
-      void
-      onResourceInitialization(void)
-      {
-        reset();
-        dispatch(m_nsb_request);
-      }
-
-      inline void
-      reset(void)
-      {
-        m_x = 0.;
-        m_y = 0.;
-        m_delta.reset();
-        debug("Obstacle reset");
-      }
-
-      void
-      consume(const IMC::NSBParameters* msg)
-      {
-        m_params.lat0 = msg->obs_lat;
-        m_params.lon0 = msg->obs_lon;
-        m_params.v_x = msg->obs_vx;
-        m_params.v_y = msg->obs_vy;
+        m_is_waiting = false;
+        m_transmission_time = 0.;
       }
 
       void
       consume(const IMC::ExperimentControl* msg)
       {
-        if (msg->delay <= 0.)
+        if (msg->delay > 0.)
         {
-          bool new_active = (msg->op == ExperimentControl::OP_START && msg->obstacle == IMC::BOOL_TRUE);
-          if (new_active != m_active)
+          if (m_is_waiting)
           {
-            m_active = new_active;
-            reset();
+            war("An ExperimentControl message is already waiting. Ignoring ...");
+            return;
           }
+          m_experiment_control.experiment = msg->experiment;
+          m_experiment_control.op = msg->op;
+          m_experiment_control.obstacle = msg->obstacle;
+          m_experiment_control.delay = 0.;
+          m_is_waiting = true;
+          m_transmission_time = Clock::getSinceEpoch() + msg->delay;
+          debug("Waiting for %g seconds", msg->delay);
         }
       }
 
@@ -139,20 +83,11 @@ namespace NSB
       void
       task(void)
       {
-        if (m_active)
+        if (m_is_waiting && (Clock::getSinceEpoch() >= m_transmission_time))
         {
-          double delta_t = m_delta.getDelta();
-          
-          m_x += m_params.v_x * delta_t;
-          m_y += m_params.v_y * delta_t;
-
-          m_message.lat = m_params.lat0;
-          m_message.lon = m_params.lon0;
-          WGS84::displace(m_x, m_y, &m_message.lat, &m_message.lon);
-          m_message.sog = std::sqrt(square(m_params.v_x) + square(m_params.v_y));
-          m_message.cog = std::atan2(m_params.v_y, m_params.v_x);
-          debug("Obstacle at (%f, %f)", m_x, m_y);
-          dispatch(m_message);
+          dispatch(m_experiment_control);
+          m_is_waiting = false;
+          debug("Re-sending the ExperimentControl message");
         }
       }
     };    

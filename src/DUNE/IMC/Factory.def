@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 70dadb3410c39c92824c33e3fe3eb09e                            *
+// IMC XML MD5: db38089ebb053077c1fe78eda6b1439b                            *
 //***************************************************************************
 
 MESSAGE(1, EntityState)
@@ -362,4 +362,8 @@ MESSAGE(2010, CommRestriction)
 MESSAGE(2022, NSBMsg)
 MESSAGE(2023, NSBState)
 MESSAGE(2024, ExperimentControl)
+MESSAGE(2025, NSBParameters)
+MESSAGE(2026, NSBParametersRequest)
+MESSAGE(2027, ClockOffset)
+MESSAGE(2028, ClockSync)
 #undef MESSAGE

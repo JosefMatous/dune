@@ -89,6 +89,7 @@ namespace NSB
       } m_desired_velocity;
       
       bool m_active; // External activation
+      double m_timeout, m_last_timestamp;
 
       std::vector<CollisionEllipse<float>> m_ellipses;
 
@@ -103,7 +104,6 @@ namespace NSB
         DUNE::Control::PathController(name, ctx)
       {
         bind<IMC::DesiredLinearState>(this);
-        bind<IMC::ExperimentControl>(this);
 
         param("Horizontal PID Gains", m_params.horizontal_gains)
           .defaultValue("0.35, 0.02, 0")
@@ -123,8 +123,9 @@ namespace NSB
           .defaultValue("-1");
         param("Minimum Surge Speed", m_params.u_min)
           .defaultValue("0.5");
-        param("Active", m_active)
-          .defaultValue("false");
+        param("Activation Timetout", m_timeout)
+          .defaultValue("0.5")
+          .minimumValue("0");
 
         param("Collision Ellipse -- Monitor", m_monitor_params.use)
           .defaultValue("false");
@@ -144,6 +145,8 @@ namespace NSB
           .defaultValue("true");   
 
         m_speed.speed_units = IMC::SUNITS_METERS_PS;
+        m_active = false;
+        m_last_timestamp = 0;
 
         reset();
       }
@@ -256,16 +259,9 @@ namespace NSB
       }
 
       void
-      consume(const IMC::ExperimentControl* msg)
-      {
-        m_active = (msg->op == ExperimentControl::OP_START);
-      }
-
-      void
       consume(const IMC::DesiredLinearState* msg)
       {
-        if (m_active)
-        {
+          m_active = true;
           if (!(msg->flags & (IMC::DesiredLinearState::FL_VX | IMC::DesiredLinearState::FL_VY)))
           {
             war("DesiredLinearState velocities are invalid");
@@ -282,7 +278,7 @@ namespace NSB
           {
             m_desired_velocity.z = 0.;
           }
-        }
+          m_last_timestamp = Clock::get();
       }
 
       inline void
@@ -311,6 +307,11 @@ namespace NSB
       void
       step(const IMC::EstimatedState& state, const TrackingState& ts)
       {
+        double time_since_last = Clock::get() - m_last_timestamp;
+        if (m_active && (time_since_last > m_timeout))
+        {          
+          m_active = false;
+        }
         if (!has_estate)
         {
           m_lat0 = state.lat;

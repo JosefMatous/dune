@@ -42,7 +42,7 @@ namespace NSB
       int n_self;
       double a_s;
       double a_p;
-      double T_min;
+      double T_min, T_min_uw;
       double T_max;
       double Q;
       Vector3D p_form;

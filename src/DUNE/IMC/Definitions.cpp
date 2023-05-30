@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 70dadb3410c39c92824c33e3fe3eb09e                            *
+// IMC XML MD5: db38089ebb053077c1fe78eda6b1439b                            *
 //***************************************************************************
 
 // ISO C++ 98 headers.
@@ -28252,6 +28252,7 @@ namespace DUNE
       op = 0;
       experiment = 0;
       obstacle = 0;
+      delay = 0;
     }
 
     bool
@@ -28261,6 +28262,7 @@ namespace DUNE
       if (op != other__.op) return false;
       if (experiment != other__.experiment) return false;
       if (obstacle != other__.obstacle) return false;
+      if (delay != other__.delay) return false;
       return true;
     }
 
@@ -28277,6 +28279,7 @@ namespace DUNE
       ptr__ += IMC::serialize(op, ptr__);
       ptr__ += IMC::serialize(experiment, ptr__);
       ptr__ += IMC::serialize(obstacle, ptr__);
+      ptr__ += IMC::serialize(delay, ptr__);
       return ptr__;
     }
 
@@ -28287,6 +28290,7 @@ namespace DUNE
       bfr__ += IMC::deserialize(op, bfr__, size__);
       bfr__ += IMC::deserialize(experiment, bfr__, size__);
       bfr__ += IMC::deserialize(obstacle, bfr__, size__);
+      bfr__ += IMC::deserialize(delay, bfr__, size__);
       return bfr__ - start__;
     }
 
@@ -28297,6 +28301,7 @@ namespace DUNE
       bfr__ += IMC::deserialize(op, bfr__, size__);
       bfr__ += IMC::deserialize(experiment, bfr__, size__);
       bfr__ += IMC::deserialize(obstacle, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(delay, bfr__, size__);
       return bfr__ - start__;
     }
 
@@ -28306,6 +28311,394 @@ namespace DUNE
       IMC::toJSON(os__, "op", op, nindent__);
       IMC::toJSON(os__, "experiment", experiment, nindent__);
       IMC::toJSON(os__, "obstacle", obstacle, nindent__);
+      IMC::toJSON(os__, "delay", delay, nindent__);
+    }
+
+    NSBParameters::NSBParameters(void)
+    {
+      m_header.mgid = 2025;
+      clear();
+    }
+
+    void
+    NSBParameters::clear(void)
+    {
+      path_lat = 0;
+      path_lon = 0;
+      path_z = 0;
+      path_a = 0;
+      path_b = 0;
+      path_c = 0;
+      path_clockwise = 0;
+      path_psi = 0;
+      path_z_freq = 0;
+      path_phi0 = 0;
+      path_z_phi0 = 0;
+      los_lookahead = 0;
+      los_speed = 0;
+      los_gain = 0;
+      los_adaptive = 0;
+      form_x = 0;
+      form_y = 0;
+      form_z = 0;
+      form_max_speed = 0;
+      form_gain = 0;
+      oa_radius = 0;
+      oa_cone = 0;
+      oa_hysteresis = 0;
+      obs_lat = 0;
+      obs_lon = 0;
+      obs_vx = 0;
+      obs_vy = 0;
+    }
+
+    bool
+    NSBParameters::fieldsEqual(const Message& msg__) const
+    {
+      const IMC::NSBParameters& other__ = static_cast<const NSBParameters&>(msg__);
+      if (path_lat != other__.path_lat) return false;
+      if (path_lon != other__.path_lon) return false;
+      if (path_z != other__.path_z) return false;
+      if (path_a != other__.path_a) return false;
+      if (path_b != other__.path_b) return false;
+      if (path_c != other__.path_c) return false;
+      if (path_clockwise != other__.path_clockwise) return false;
+      if (path_psi != other__.path_psi) return false;
+      if (path_z_freq != other__.path_z_freq) return false;
+      if (path_phi0 != other__.path_phi0) return false;
+      if (path_z_phi0 != other__.path_z_phi0) return false;
+      if (los_lookahead != other__.los_lookahead) return false;
+      if (los_speed != other__.los_speed) return false;
+      if (los_gain != other__.los_gain) return false;
+      if (los_adaptive != other__.los_adaptive) return false;
+      if (form_x != other__.form_x) return false;
+      if (form_y != other__.form_y) return false;
+      if (form_z != other__.form_z) return false;
+      if (form_max_speed != other__.form_max_speed) return false;
+      if (form_gain != other__.form_gain) return false;
+      if (oa_radius != other__.oa_radius) return false;
+      if (oa_cone != other__.oa_cone) return false;
+      if (oa_hysteresis != other__.oa_hysteresis) return false;
+      if (obs_lat != other__.obs_lat) return false;
+      if (obs_lon != other__.obs_lon) return false;
+      if (obs_vx != other__.obs_vx) return false;
+      if (obs_vy != other__.obs_vy) return false;
+      return true;
+    }
+
+    int
+    NSBParameters::validate(void) const
+    {
+      return true;
+    }
+
+    uint8_t*
+    NSBParameters::serializeFields(uint8_t* bfr__) const
+    {
+      uint8_t* ptr__ = bfr__;
+      ptr__ += IMC::serialize(path_lat, ptr__);
+      ptr__ += IMC::serialize(path_lon, ptr__);
+      ptr__ += IMC::serialize(path_z, ptr__);
+      ptr__ += IMC::serialize(path_a, ptr__);
+      ptr__ += IMC::serialize(path_b, ptr__);
+      ptr__ += IMC::serialize(path_c, ptr__);
+      ptr__ += IMC::serialize(path_clockwise, ptr__);
+      ptr__ += IMC::serialize(path_psi, ptr__);
+      ptr__ += IMC::serialize(path_z_freq, ptr__);
+      ptr__ += IMC::serialize(path_phi0, ptr__);
+      ptr__ += IMC::serialize(path_z_phi0, ptr__);
+      ptr__ += IMC::serialize(los_lookahead, ptr__);
+      ptr__ += IMC::serialize(los_speed, ptr__);
+      ptr__ += IMC::serialize(los_gain, ptr__);
+      ptr__ += IMC::serialize(los_adaptive, ptr__);
+      ptr__ += IMC::serialize(form_x, ptr__);
+      ptr__ += IMC::serialize(form_y, ptr__);
+      ptr__ += IMC::serialize(form_z, ptr__);
+      ptr__ += IMC::serialize(form_max_speed, ptr__);
+      ptr__ += IMC::serialize(form_gain, ptr__);
+      ptr__ += IMC::serialize(oa_radius, ptr__);
+      ptr__ += IMC::serialize(oa_cone, ptr__);
+      ptr__ += IMC::serialize(oa_hysteresis, ptr__);
+      ptr__ += IMC::serialize(obs_lat, ptr__);
+      ptr__ += IMC::serialize(obs_lon, ptr__);
+      ptr__ += IMC::serialize(obs_vx, ptr__);
+      ptr__ += IMC::serialize(obs_vy, ptr__);
+      return ptr__;
+    }
+
+    uint16_t
+    NSBParameters::deserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      const uint8_t* start__ = bfr__;
+      bfr__ += IMC::deserialize(path_lat, bfr__, size__);
+      bfr__ += IMC::deserialize(path_lon, bfr__, size__);
+      bfr__ += IMC::deserialize(path_z, bfr__, size__);
+      bfr__ += IMC::deserialize(path_a, bfr__, size__);
+      bfr__ += IMC::deserialize(path_b, bfr__, size__);
+      bfr__ += IMC::deserialize(path_c, bfr__, size__);
+      bfr__ += IMC::deserialize(path_clockwise, bfr__, size__);
+      bfr__ += IMC::deserialize(path_psi, bfr__, size__);
+      bfr__ += IMC::deserialize(path_z_freq, bfr__, size__);
+      bfr__ += IMC::deserialize(path_phi0, bfr__, size__);
+      bfr__ += IMC::deserialize(path_z_phi0, bfr__, size__);
+      bfr__ += IMC::deserialize(los_lookahead, bfr__, size__);
+      bfr__ += IMC::deserialize(los_speed, bfr__, size__);
+      bfr__ += IMC::deserialize(los_gain, bfr__, size__);
+      bfr__ += IMC::deserialize(los_adaptive, bfr__, size__);
+      bfr__ += IMC::deserialize(form_x, bfr__, size__);
+      bfr__ += IMC::deserialize(form_y, bfr__, size__);
+      bfr__ += IMC::deserialize(form_z, bfr__, size__);
+      bfr__ += IMC::deserialize(form_max_speed, bfr__, size__);
+      bfr__ += IMC::deserialize(form_gain, bfr__, size__);
+      bfr__ += IMC::deserialize(oa_radius, bfr__, size__);
+      bfr__ += IMC::deserialize(oa_cone, bfr__, size__);
+      bfr__ += IMC::deserialize(oa_hysteresis, bfr__, size__);
+      bfr__ += IMC::deserialize(obs_lat, bfr__, size__);
+      bfr__ += IMC::deserialize(obs_lon, bfr__, size__);
+      bfr__ += IMC::deserialize(obs_vx, bfr__, size__);
+      bfr__ += IMC::deserialize(obs_vy, bfr__, size__);
+      return bfr__ - start__;
+    }
+
+    uint16_t
+    NSBParameters::reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      const uint8_t* start__ = bfr__;
+      bfr__ += IMC::reverseDeserialize(path_lat, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(path_lon, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(path_z, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(path_a, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(path_b, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(path_c, bfr__, size__);
+      bfr__ += IMC::deserialize(path_clockwise, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(path_psi, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(path_z_freq, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(path_phi0, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(path_z_phi0, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(los_lookahead, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(los_speed, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(los_gain, bfr__, size__);
+      bfr__ += IMC::deserialize(los_adaptive, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(form_x, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(form_y, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(form_z, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(form_max_speed, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(form_gain, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(oa_radius, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(oa_cone, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(oa_hysteresis, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(obs_lat, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(obs_lon, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(obs_vx, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(obs_vy, bfr__, size__);
+      return bfr__ - start__;
+    }
+
+    void
+    NSBParameters::fieldsToJSON(std::ostream& os__, unsigned nindent__) const
+    {
+      IMC::toJSON(os__, "path_lat", path_lat, nindent__);
+      IMC::toJSON(os__, "path_lon", path_lon, nindent__);
+      IMC::toJSON(os__, "path_z", path_z, nindent__);
+      IMC::toJSON(os__, "path_a", path_a, nindent__);
+      IMC::toJSON(os__, "path_b", path_b, nindent__);
+      IMC::toJSON(os__, "path_c", path_c, nindent__);
+      IMC::toJSON(os__, "path_clockwise", path_clockwise, nindent__);
+      IMC::toJSON(os__, "path_psi", path_psi, nindent__);
+      IMC::toJSON(os__, "path_z_freq", path_z_freq, nindent__);
+      IMC::toJSON(os__, "path_phi0", path_phi0, nindent__);
+      IMC::toJSON(os__, "path_z_phi0", path_z_phi0, nindent__);
+      IMC::toJSON(os__, "los_lookahead", los_lookahead, nindent__);
+      IMC::toJSON(os__, "los_speed", los_speed, nindent__);
+      IMC::toJSON(os__, "los_gain", los_gain, nindent__);
+      IMC::toJSON(os__, "los_adaptive", los_adaptive, nindent__);
+      IMC::toJSON(os__, "form_x", form_x, nindent__);
+      IMC::toJSON(os__, "form_y", form_y, nindent__);
+      IMC::toJSON(os__, "form_z", form_z, nindent__);
+      IMC::toJSON(os__, "form_max_speed", form_max_speed, nindent__);
+      IMC::toJSON(os__, "form_gain", form_gain, nindent__);
+      IMC::toJSON(os__, "oa_radius", oa_radius, nindent__);
+      IMC::toJSON(os__, "oa_cone", oa_cone, nindent__);
+      IMC::toJSON(os__, "oa_hysteresis", oa_hysteresis, nindent__);
+      IMC::toJSON(os__, "obs_lat", obs_lat, nindent__);
+      IMC::toJSON(os__, "obs_lon", obs_lon, nindent__);
+      IMC::toJSON(os__, "obs_vx", obs_vx, nindent__);
+      IMC::toJSON(os__, "obs_vy", obs_vy, nindent__);
+    }
+
+    NSBParametersRequest::NSBParametersRequest(void)
+    {
+      m_header.mgid = 2026;
+      clear();
+    }
+
+    void
+    NSBParametersRequest::clear(void)
+    {
+    }
+
+    int
+    NSBParametersRequest::validate(void) const
+    {
+      return true;
+    }
+
+    uint8_t*
+    NSBParametersRequest::serializeFields(uint8_t* bfr__) const
+    {
+      return bfr__;
+    }
+
+    uint16_t
+    NSBParametersRequest::deserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      (void)bfr__;
+      (void)size__;
+      return 0;
+    }
+
+    uint16_t
+    NSBParametersRequest::reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      (void)bfr__;
+      (void)size__;
+      return 0;
+    }
+
+    ClockOffset::ClockOffset(void)
+    {
+      m_header.mgid = 2027;
+      clear();
+    }
+
+    void
+    ClockOffset::clear(void)
+    {
+      system = 0;
+      offset = 0;
+    }
+
+    bool
+    ClockOffset::fieldsEqual(const Message& msg__) const
+    {
+      const IMC::ClockOffset& other__ = static_cast<const ClockOffset&>(msg__);
+      if (system != other__.system) return false;
+      if (offset != other__.offset) return false;
+      return true;
+    }
+
+    int
+    ClockOffset::validate(void) const
+    {
+      return true;
+    }
+
+    uint8_t*
+    ClockOffset::serializeFields(uint8_t* bfr__) const
+    {
+      uint8_t* ptr__ = bfr__;
+      ptr__ += IMC::serialize(system, ptr__);
+      ptr__ += IMC::serialize(offset, ptr__);
+      return ptr__;
+    }
+
+    uint16_t
+    ClockOffset::deserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      const uint8_t* start__ = bfr__;
+      bfr__ += IMC::deserialize(system, bfr__, size__);
+      bfr__ += IMC::deserialize(offset, bfr__, size__);
+      return bfr__ - start__;
+    }
+
+    uint16_t
+    ClockOffset::reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      const uint8_t* start__ = bfr__;
+      bfr__ += IMC::reverseDeserialize(system, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(offset, bfr__, size__);
+      return bfr__ - start__;
+    }
+
+    void
+    ClockOffset::fieldsToJSON(std::ostream& os__, unsigned nindent__) const
+    {
+      IMC::toJSON(os__, "system", system, nindent__);
+      IMC::toJSON(os__, "offset", offset, nindent__);
+    }
+
+    ClockSync::ClockSync(void)
+    {
+      m_header.mgid = 2028;
+      clear();
+    }
+
+    void
+    ClockSync::clear(void)
+    {
+      op = 0;
+      id = 0;
+    }
+
+    bool
+    ClockSync::fieldsEqual(const Message& msg__) const
+    {
+      const IMC::ClockSync& other__ = static_cast<const ClockSync&>(msg__);
+      if (op != other__.op) return false;
+      if (id != other__.id) return false;
+      return true;
+    }
+
+    int
+    ClockSync::validate(void) const
+    {
+      return true;
+    }
+
+    uint8_t*
+    ClockSync::serializeFields(uint8_t* bfr__) const
+    {
+      uint8_t* ptr__ = bfr__;
+      ptr__ += IMC::serialize(op, ptr__);
+      ptr__ += IMC::serialize(id, ptr__);
+      return ptr__;
+    }
+
+    uint16_t
+    ClockSync::deserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      const uint8_t* start__ = bfr__;
+      bfr__ += IMC::deserialize(op, bfr__, size__);
+      bfr__ += IMC::deserialize(id, bfr__, size__);
+      return bfr__ - start__;
+    }
+
+    uint16_t
+    ClockSync::reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      const uint8_t* start__ = bfr__;
+      bfr__ += IMC::deserialize(op, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(id, bfr__, size__);
+      return bfr__ - start__;
+    }
+
+    uint16_t
+    ClockSync::getSubId(void) const
+    {
+      return id;
+    }
+
+    void
+    ClockSync::setSubId(uint16_t subid)
+    {
+      id = (uint16_t)subid;
+    }
+
+    void
+    ClockSync::fieldsToJSON(std::ostream& os__, unsigned nindent__) const
+    {
+      IMC::toJSON(os__, "op", op, nindent__);
+      IMC::toJSON(os__, "id", id, nindent__);
     }
   }
 }

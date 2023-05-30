@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 70dadb3410c39c92824c33e3fe3eb09e                            *
+// IMC XML MD5: db38089ebb053077c1fe78eda6b1439b                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_DEFINITIONS_HPP_INCLUDED_
@@ -26733,6 +26733,8 @@ namespace DUNE
       uint8_t experiment;
       //! Activate Obstacle.
       uint8_t obstacle;
+      //! Delay.
+      fp64_t delay;
 
       static uint16_t
       getIdStatic(void)
@@ -26781,8 +26783,315 @@ namespace DUNE
       unsigned
       getFixedSerializationSize(void) const
       {
+        return 11;
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! NSB Parameters.
+    class NSBParameters: public Message
+    {
+    public:
+      //! Path Latitude.
+      fp64_t path_lat;
+      //! Path Longitude.
+      fp64_t path_lon;
+      //! Path Depth.
+      fp64_t path_z;
+      //! Path Semimajor Axis.
+      fp64_t path_a;
+      //! Path Semiminor Axis.
+      fp64_t path_b;
+      //! Path Z Amplitude.
+      fp64_t path_c;
+      //! Path Clockwise.
+      uint8_t path_clockwise;
+      //! Path Orientation.
+      fp64_t path_psi;
+      //! Path Z Frequency.
+      fp64_t path_z_freq;
+      //! Path Initial Phase.
+      fp64_t path_phi0;
+      //! Path Z Initial Phase.
+      fp64_t path_z_phi0;
+      //! LOS Lookahead Distance.
+      fp64_t los_lookahead;
+      //! LOS Speed.
+      fp64_t los_speed;
+      //! LOS Update Gain.
+      fp64_t los_gain;
+      //! LOS Adaptive.
+      uint8_t los_adaptive;
+      //! Formation x.
+      fp64_t form_x;
+      //! Formation y.
+      fp64_t form_y;
+      //! Formation z.
+      fp64_t form_z;
+      //! Formation Maximum Speed.
+      fp64_t form_max_speed;
+      //! Formation Keeping Gain.
+      fp64_t form_gain;
+      //! Obstacle Avoidance Radius.
+      fp64_t oa_radius;
+      //! Collision Cone Angle.
+      fp64_t oa_cone;
+      //! Obstacle Avoidance Hysteresis.
+      fp64_t oa_hysteresis;
+      //! Obstacle Latitude.
+      fp64_t obs_lat;
+      //! Obstacle Longitude.
+      fp64_t obs_lon;
+      //! Obstacle Velocity x.
+      fp64_t obs_vx;
+      //! Obstacle Velocity y.
+      fp64_t obs_vy;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 2025;
+      }
+
+      NSBParameters(void);
+
+      NSBParameters*
+      clone(void) const
+      {
+        return new NSBParameters(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return NSBParameters::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "NSBParameters";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 202;
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! NSB Parameters Request.
+    class NSBParametersRequest: public Message
+    {
+    public:
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 2026;
+      }
+
+      NSBParametersRequest(void);
+
+      NSBParametersRequest*
+      clone(void) const
+      {
+        return new NSBParametersRequest(*this);
+      }
+
+      void
+      clear(void);
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return NSBParametersRequest::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "NSBParametersRequest";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 0;
+      }
+    };
+
+    //! Clock Offset.
+    class ClockOffset: public Message
+    {
+    public:
+      //! System.
+      uint16_t system;
+      //! Offset.
+      fp64_t offset;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 2027;
+      }
+
+      ClockOffset(void);
+
+      ClockOffset*
+      clone(void) const
+      {
+        return new ClockOffset(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return ClockOffset::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "ClockOffset";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 10;
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! Clock Synchronization Message.
+    class ClockSync: public Message
+    {
+    public:
+      //! Operation.
+      enum OperationEnum
+      {
+        //! Request.
+        OP_REQUEST = 0,
+        //! Reply.
+        OP_REPLY = 1
+      };
+
+      //! Operation.
+      uint8_t op;
+      //! Request ID.
+      uint16_t id;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 2028;
+      }
+
+      ClockSync(void);
+
+      ClockSync*
+      clone(void) const
+      {
+        return new ClockSync(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return ClockSync::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "ClockSync";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
         return 3;
       }
+
+      uint16_t
+      getSubId(void) const;
+
+      void
+      setSubId(uint16_t subid);
 
       void
       fieldsToJSON(std::ostream& os__, unsigned nindent__) const;

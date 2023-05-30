@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2021 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2022 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -24,44 +24,74 @@
 // https://github.com/LSTS/dune/blob/master/LICENCE.md and                  *
 // http://ec.europa.eu/idabc/eupl.html.                                     *
 //***************************************************************************
-// Author: Ricardo Martins                                                  *
-//***************************************************************************
-// Automatically generated.                                                 *
-//***************************************************************************
-// IMC XML MD5: db38089ebb053077c1fe78eda6b1439b                            *
+// Author: Josef Matous                                                     *
 //***************************************************************************
 
-#ifndef DUNE_IMC_HEADER_HPP_INCLUDED_
-#define DUNE_IMC_HEADER_HPP_INCLUDED_
+#ifndef NSB_PARAMETERS_HPP_
+#define NSB_PARAMETERS_HPP_
 
 // DUNE headers.
-#include <DUNE/Config.hpp>
+#include <DUNE/DUNE.hpp>
 
-namespace DUNE
+#include "Utilities.hpp"
+#include "GeometricPath.hpp"
+#include "LineOfSight.hpp"
+#include "FormationKeeping.hpp"
+#include "ObstacleAvoidance.hpp"
+
+namespace NSB
 {
-  namespace IMC
-  {
-    //! Header format.
-    struct Header
+    using DUNE_NAMESPACES;
+
+    inline void
+    updatePathParameters(const IMC::NSBParameters* param, Ellipse& path, double lat0, double lon0)
     {
-      //! Synchronization Number.
-      uint16_t sync;
-      //! Message Identification Number.
-      uint16_t mgid;
-      //! Message size.
-      uint16_t size;
-      //! Time stamp.
-      fp64_t timestamp;
-      //! Source Address.
-      uint16_t src;
-      //! Source Entity.
-      uint8_t src_ent;
-      //! Destination Address.
-      uint16_t dst;
-      //! Destination Entity.
-      uint8_t dst_ent;
-    };
-  }
+      WGS84::displacement(lat0, lon0, 0., param->path_lat, param->path_lon, 0., &(path.m_x_center), &(path.m_y_center)); 
+      path.m_z_center = param->path_z;
+
+      path.m_a = param->path_a;
+      path.m_b = param->path_b;
+      path.m_c = param->path_c;
+
+      path.m_clockwise = param->path_clockwise;
+      path.m_psi = param->path_psi;
+      path.m_z_freq = param->path_z_freq;
+      path.m_phi0 = param->path_phi0;
+      path.m_z_phi0 = param->path_z_phi0;
+    }
+
+    inline void
+    updateLosParameters(const IMC::NSBParameters* param, LineOfSight& los)
+    {
+      los.m_lookahead = param->los_lookahead;
+      los.m_adaptive = (param->los_adaptive == IMC::BOOL_TRUE);
+      los.m_speed = param->los_speed;
+      los.m_parameter_gain = param->los_gain;
+    }
+
+    inline void
+    updateFormationShape(const IMC::NSBParameters* param, Vector3D& p_form)
+    {
+      p_form.x = param->form_x;
+      p_form.y = param->form_y;
+      p_form.z = param->form_z;
+    }
+
+    inline void
+    updateFormationKeeping(const IMC::NSBParameters* param, FormationKeepingSaturated& form)
+    {
+      updateFormationShape(param, form.p_form);
+      form.k_form = param->form_gain;
+      form.v_max = param->form_max_speed;
+    }
+
+    inline void
+    updateObstacleAvoidance(const IMC::NSBParameters* param, ObstacleAvoidance& oa)
+    {
+      oa.m_cone_min = param->oa_cone;
+      oa.m_obstacle_radius = param->oa_radius;
+      oa.m_hysteresis = param->oa_hysteresis;
+    }
 }
 
 #endif
