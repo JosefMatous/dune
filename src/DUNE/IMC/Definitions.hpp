@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 81a231ec258c74d260a4ec19beafc2c1                            *
+// IMC XML MD5: f1a480023cccfd4eaf9c8624e562ffd5                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_DEFINITIONS_HPP_INCLUDED_
@@ -26571,10 +26571,14 @@ namespace DUNE
       fp64_t lat;
       //! Longitude WGS-84.
       fp64_t lon;
+      //! Depth.
+      fp32_t z;
       //! Velocity x.
       fp32_t v_x;
       //! Velocity y.
       fp32_t v_y;
+      //! Velocity z.
+      fp32_t v_z;
 
       static uint16_t
       getIdStatic(void)
@@ -26623,7 +26627,7 @@ namespace DUNE
       unsigned
       getFixedSerializationSize(void) const
       {
-        return 24;
+        return 32;
       }
 
       void
