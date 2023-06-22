@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: f1a480023cccfd4eaf9c8624e562ffd5                            *
+// IMC XML MD5: acdb5938318a606efc568d43587bd366                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_MACROS_HPP_INCLUDED_
@@ -692,5 +692,7 @@
 #define DUNE_IMC_COMMRESTRICTION 2010
 //! ConsensusPacket identification number.
 #define DUNE_IMC_CONSENSUSPACKET 2020
+//! VirtualTarget identification number.
+#define DUNE_IMC_VIRTUALTARGET 2021
 
 #endif

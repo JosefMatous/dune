@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: f1a480023cccfd4eaf9c8624e562ffd5                            *
+// IMC XML MD5: acdb5938318a606efc568d43587bd366                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_DEFINITIONS_HPP_INCLUDED_
@@ -26632,6 +26632,89 @@ namespace DUNE
 
       void
       fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! Virtual Target.
+    class VirtualTarget: public Message
+    {
+    public:
+      //! Message.
+      InlineMessage<ConsensusPacket> msg;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 2021;
+      }
+
+      VirtualTarget(void);
+
+      VirtualTarget*
+      clone(void) const
+      {
+        return new VirtualTarget(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return VirtualTarget::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "VirtualTarget";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 0;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return msg.getSerializationSize();
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+
+    protected:
+      void
+      setTimeStampNested(double value__);
+
+      void
+      setSourceNested(uint16_t value__);
+
+      void
+      setSourceEntityNested(uint8_t value__);
+
+      void
+      setDestinationNested(uint16_t value__);
+
+      void
+      setDestinationEntityNested(uint8_t value__);
     };
   }
 }

@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: f1a480023cccfd4eaf9c8624e562ffd5                            *
+// IMC XML MD5: acdb5938318a606efc568d43587bd366                            *
 //***************************************************************************
 
 // ISO C++ 98 headers.
@@ -28154,6 +28154,108 @@ namespace DUNE
       IMC::toJSON(os__, "v_x", v_x, nindent__);
       IMC::toJSON(os__, "v_y", v_y, nindent__);
       IMC::toJSON(os__, "v_z", v_z, nindent__);
+    }
+
+    VirtualTarget::VirtualTarget(void)
+    {
+      m_header.mgid = 2021;
+      clear();
+      msg.setParent(this);
+    }
+
+    void
+    VirtualTarget::clear(void)
+    {
+      msg.clear();
+    }
+
+    bool
+    VirtualTarget::fieldsEqual(const Message& msg__) const
+    {
+      const IMC::VirtualTarget& other__ = static_cast<const VirtualTarget&>(msg__);
+      if (msg != other__.msg) return false;
+      return true;
+    }
+
+    int
+    VirtualTarget::validate(void) const
+    {
+      return true;
+    }
+
+    uint8_t*
+    VirtualTarget::serializeFields(uint8_t* bfr__) const
+    {
+      uint8_t* ptr__ = bfr__;
+      ptr__ += msg.serialize(ptr__);
+      return ptr__;
+    }
+
+    uint16_t
+    VirtualTarget::deserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      const uint8_t* start__ = bfr__;
+      bfr__ += msg.deserialize(bfr__, size__);
+      return bfr__ - start__;
+    }
+
+    uint16_t
+    VirtualTarget::reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      const uint8_t* start__ = bfr__;
+      bfr__ += msg.reverseDeserialize(bfr__, size__);
+      return bfr__ - start__;
+    }
+
+    void
+    VirtualTarget::fieldsToJSON(std::ostream& os__, unsigned nindent__) const
+    {
+      msg.toJSON(os__, "msg", nindent__);
+    }
+
+    void
+    VirtualTarget::setTimeStampNested(double value__)
+    {
+      if (!msg.isNull())
+      {
+        msg.get()->setTimeStamp(value__);
+      }
+    }
+
+    void
+    VirtualTarget::setSourceNested(uint16_t value__)
+    {
+      if (!msg.isNull())
+      {
+        msg.get()->setSource(value__);
+      }
+    }
+
+    void
+    VirtualTarget::setSourceEntityNested(uint8_t value__)
+    {
+      if (!msg.isNull())
+      {
+        msg.get()->setSourceEntity(value__);
+      }
+    }
+
+    void
+    VirtualTarget::setDestinationNested(uint16_t value__)
+    {
+      if (!msg.isNull())
+      {
+        msg.get()->setDestination(value__);
+      }
+    }
+
+    void
+    VirtualTarget::setDestinationEntityNested(uint8_t value__)
+    {
+      if (!msg.isNull())
+      {
+        msg.get()->setDestinationEntity(value__);
+      }
     }
   }
 }
