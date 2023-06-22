@@ -147,8 +147,10 @@ namespace Consensus
         m_message.lat = msg->lat;
         m_message.lon = msg->lon;
         WGS84::displace(m_hand.x, m_hand.y, &m_message.lat, &m_message.lon);
+        m_message.z = m_hand.z;
         m_message.v_x = m_hand.x_dot;
         m_message.v_y = m_hand.y_dot;
+        m_message.v_z = m_hand.z_dot;
 
         m_message.setSourceEntity(getEntityId());
         m_last_timestep = msg->getTimeStamp();

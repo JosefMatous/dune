@@ -87,6 +87,15 @@ namespace Consensus
     u->x = c*(z_d->x - z.x) + h_target->x_dot;
     u->y = c*(z_d->y - z.y) + h_target->y_dot;
   }
+
+  //! Vertical controller
+  inline void
+  vertical_control(const IMC::EstimatedState& state, const HandPosition* h_self, const HandPosition* h_target, float z_d, float c_pz, float c_vz, IMC::DesiredZ& z_ref)
+  {
+    float z = h_target->z + z_d + c_pz*(h_target->z - h_self->z) + c_vz*h_target->z_dot + (state.z - h_self->z);
+    z_ref.z_units = IMC::Z_DEPTH;
+    z_ref.value = trimValue(z, 0., 20.);
+  }
 }
 
 #endif

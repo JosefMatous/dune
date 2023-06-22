@@ -55,8 +55,14 @@ namespace Consensus
         float h;
         //! Formation-keeping proportional gain
         float c;
+        //! Vertical proportional gain
+        float c_pz;
+        //! Vertical feedforward gain
+        float c_vz;
         //! Formation offset
         Vector2D offset;
+        //! Formation offset in z
+        float offset_z;
         //! Maximum velocity reference
         float U_max;
         //! Minimum velocity reference
@@ -97,15 +103,21 @@ namespace Consensus
         DUNE::Control::PathController(name, ctx)
       {
         bind<IMC::EstimatedState>(this);
-        bind<IMC::Target>(this);
+        bind<IMC::VirtualTarget>(this);
 
         param("Hand Length", m_controller.h)
           .defaultValue("1");
         param("Formation Keeping Gain", m_params.c)
           .defaultValue("0.1");
+        param("Vertical Proportional Gain", m_params.c_pz)
+          .defaultValue("0.5");
+        param("Vertical Feedforward Gain", m_params.c_vz)
+          .defaultValue("1");
         param("Formation Offset x", m_params.offset.x)
           .defaultValue("0");
         param("Formation Offset y", m_params.offset.y)
+          .defaultValue("0");
+        param("Formation Offset z", m_params.offset_z)
           .defaultValue("0");
         param("Maximum Speed Reference", m_controller.U_max)
           .defaultValue("2");
@@ -205,10 +217,12 @@ namespace Consensus
             double xy_norm_inv = 1. / std::sqrt(x_rel*x_rel + y_rel*y_rel);
             m_hand_velocity_reference.x = x_rel * xy_norm_inv;
             m_hand_velocity_reference.y = y_rel * xy_norm_inv;
+            m_z_ref.value = ts.end.z;
+            m_z_ref.z_units = IMC::Z_DEPTH;
           } else
           {
-            //debug("Performing consensus");
             edge_consensus(&m_own_hand, &m_target_hand, &m_params.offset, m_params.c, &m_hand_velocity_reference);
+            vertical_control(state, &m_own_hand, &m_target_hand, m_params.offset_z, m_params.c_pz, m_params.c_vz, m_z_ref);
             if (m_params.use_barrier)
               m_speed_barrier.step(&m_hand_velocity_reference, state.u, state.psi);
           }
@@ -231,14 +245,16 @@ namespace Consensus
       }
 
       void
-      consume(const IMC::Target* msg)
+      consume(const IMC::VirtualTarget* msg)
       {
         if (m_active && is_initialized)
         {
           float z_dummy;
-          WGS84::displacement(m_lat, m_lon, 0., msg->lat, msg->lon, 0., &m_target_hand.x, &m_target_hand.y, &z_dummy);
-          m_target_hand.x_dot = msg->sog * std::cos(msg->cog);
-          m_target_hand.y_dot = msg->sog * std::sin(msg->cog);
+          WGS84::displacement(m_lat, m_lon, 0., msg->msg->lat, msg->msg->lon, 0., &m_target_hand.x, &m_target_hand.y, &z_dummy);
+          m_target_hand.z = msg->msg->z;
+          m_target_hand.x_dot = msg->msg->v_x;
+          m_target_hand.y_dot = msg->msg->v_y;
+          m_target_hand.z_dot = msg->msg->v_z;
 
           if (++m_dummy_counter >= m_params.dummy_freq)
           {

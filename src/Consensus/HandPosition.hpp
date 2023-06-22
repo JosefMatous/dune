@@ -40,19 +40,25 @@ namespace Consensus
 
   struct HandPosition
   {
-    float x, y, x_dot, y_dot;
+    float x, y, z, x_dot, y_dot, z_dot;
   };
   
   //! Calculates hand position from estimated state
   inline void 
   get_hand_position(const IMC::EstimatedState* estate, float h, HandPosition* destination)
   {
+    float c_phi = std::cos(estate->phi);
+    float s_phi = std::sin(estate->phi);
+    float c_theta = std::cos(estate->theta);
+    float s_theta = std::sin(estate->theta);
     float c_psi = std::cos(estate->psi);
     float s_psi = std::sin(estate->psi);
-    destination->x = estate->x + h*c_psi;
-    destination->y = estate->y + h*s_psi;
-    destination->x_dot = estate->u*c_psi - estate->v*s_psi - h*s_psi*estate->r;
-    destination->y_dot = estate->u*s_psi + estate->v*c_psi + h*c_psi*estate->r;
+    destination->x = estate->x + h*c_theta*c_psi;
+    destination->y = estate->y + h*c_theta*s_psi;
+    destination->z = estate->z - h*s_theta;
+    destination->x_dot = estate->vx + h * (estate->r*(c_psi*c_phi*s_theta - c_phi*s_psi) - estate->q*(c_phi*c_psi*s_theta + s_phi*s_psi));
+    destination->y_dot = estate->vy + h * (estate->r*(s_psi*s_phi*s_theta + c_phi*c_psi) + estate->q*(c_psi*s_phi - c_phi*s_psi*s_theta));
+    destination->z_dot = estate->vz + h * (c_theta * (estate->r*s_phi - estate->q*c_phi));
   }
 
   class HandPositionController

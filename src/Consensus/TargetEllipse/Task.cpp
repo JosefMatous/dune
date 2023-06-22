@@ -32,12 +32,12 @@
 
 namespace Consensus
 {
-  //! Target
+  //! TargetEllipse
   //!
   //! Simulates a target (a virtual leader).
-  //! Currently configured to move on a circular trajectory.
+  //! Currently configured to move on an ellipse with oscillating depth.
   //! @author Josef Matous
-  namespace Target
+  namespace TargetEllipse
   {
     using DUNE_NAMESPACES;
 
@@ -46,26 +46,32 @@ namespace Consensus
     {
       struct 
       {
-        //! Speed.
-        double U;
-        //! Radius.
-        double r;
+        //! Wavenumber.
+        double k;
+        //! Semimajor axis.
+        double a;
+        //! Semiminor axis.
+        double b;
+        //! Z amplitude.
+        double c;
         //! Latitude of the origin.
         double lat;
         //! Longitude of the origin.
         double lon;
+        //! Origin depth.
+        double z;
         //! Initial phase.
         double phi0;
         //! True for counter-clockwise, false for clockwise.
         bool direction;
       } m_params;
 
-      double m_phi;
-
       IMC::VirtualTarget m_target;
       IMC::ConsensusPacket m_message;
 
       bool m_active;
+      double m_t;
+      double m_dir;
 
       //! Constructor.
       //! @param[in] name task name.
@@ -75,14 +81,20 @@ namespace Consensus
       {
         setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_IDLE);
 
-        param("Speed", m_params.U)
-          .defaultValue("0.8");
-        param("Radius", m_params.r)
+        param("Wavenumber", m_params.k)
+          .defaultValue("0.020943951023931952");
+        param("Semimajor axis", m_params.a)
           .defaultValue("50");
+        param("Semiminor axis", m_params.b)
+          .defaultValue("30");
+        param("Z amplitude", m_params.c)
+          .defaultValue("5");
         param("Origin Latitude", m_params.lat)
           .defaultValue("0.71882959");
         param("Origin Longitude", m_params.lon)
           .defaultValue("-0.15195186");
+        param("Origin Depth", m_params.z)
+          .defaultValue("5");
         param("Initial Phase", m_params.phi0)
           .defaultValue("0");
         param("Direction", m_params.direction)
@@ -91,6 +103,7 @@ namespace Consensus
           .defaultValue("false");
 
         m_target.msg.set(m_message);
+
         reset();
       }
 
@@ -105,6 +118,9 @@ namespace Consensus
         {
           requestDeactivation();
         }
+
+        if (paramChanged(m_params.direction))
+          m_dir = m_params.direction ? 1. : -1;
       }
 
       void
@@ -135,7 +151,7 @@ namespace Consensus
       reset(void)
       {
         debug("Target reset");
-        m_phi = m_params.phi0;
+        m_t = 0.;
       }
 
       //! Main loop.
@@ -144,26 +160,28 @@ namespace Consensus
       {
         if (isActive())
         {
-          double dir = m_params.direction ? 1. : -1;
-          double c_phi = std::cos(m_phi);
-          double s_phi = std::sin(m_phi);
-          double x = m_params.r * c_phi;
-          double y = m_params.r * s_phi;
+          double k_dir = m_dir*m_params.k;
+          double phi = m_params.phi0 + k_dir*m_t;
+          double c_phi = std::cos(phi);
+          double s_phi = std::sin(phi);
+          
 
-          m_target.msg->v_x = -dir * m_params.U * s_phi;
-          m_target.msg->v_y = dir * m_params.U * c_phi;
+          double x = m_params.a * c_phi;
+          double y = m_params.b * s_phi;
+          m_target.msg->z = m_params.z + m_params.c * s_phi * s_phi;
+
+          m_target.msg->v_x = - m_params.a * k_dir * s_phi;
+          m_target.msg->v_y = m_params.b * k_dir * c_phi;
+          m_target.msg->v_z = 2 * m_params.c * k_dir * c_phi * s_phi;
 
           m_target.msg->lat = m_params.lat;
           m_target.msg->lon = m_params.lon;
           WGS84::displace(x, y, &m_target.msg->lat, &m_target.msg->lon);
-          debug("Target at %f, %f", m_target.msg->lat, m_target.msg->lon);
-
-          m_target.msg->z = 0.;
-          m_target.msg->v_z = 0.;
+          debug("Target at %f, %f, %f", m_target.msg->lat, m_target.msg->lon, m_target.msg->z);
 
           dispatch(m_target);
 
-          m_phi += dir * m_params.U / (m_params.r * getFrequency());
+          m_t += std::pow(getFrequency(), -1.);
         }
       }
     };    

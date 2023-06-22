@@ -55,10 +55,16 @@ namespace Consensus
         float h;
         //! Formation-keeping proportional gain
         float c;
+        //! Vertical proportional gain
+        float c_pz;
+        //! Vertical feedforward gain
+        float c_vz;
         //! Constraint gain
         float rho;
         //! Formation offset
         Vector2D offset;
+        //! Formation offset in z
+        float offset_z;
         //! Minimum safety distance
         float d_min;
         //! Maximum distance
@@ -113,11 +119,17 @@ namespace Consensus
           .defaultValue("1");
         param("Formation Keeping Gain", m_params.c)
           .defaultValue("0.1");
+        param("Vertical Proportional Gain", m_params.c_pz)
+          .defaultValue("0.5");
+        param("Vertical Feedforward Gain", m_params.c_vz)
+          .defaultValue("1");
         param("Constraint Gain", m_params.rho)
           .defaultValue("5");
         param("Formation Offset x", m_params.offset.x)
           .defaultValue("0");
         param("Formation Offset y", m_params.offset.y)
+          .defaultValue("0");
+        param("Formation Offset z", m_params.offset_z)
           .defaultValue("0");
         param("Minimum Distance", m_params.d_min)
           .defaultValue("5");
@@ -226,10 +238,13 @@ namespace Consensus
             double xy_norm_inv = 1. / std::sqrt(x_rel*x_rel + y_rel*y_rel);
             m_hand_velocity_reference.x = x_rel * xy_norm_inv;
             m_hand_velocity_reference.y = y_rel * xy_norm_inv;
+            m_z_ref.value = ts.end.z;
+            m_z_ref.z_units = IMC::Z_DEPTH;
           } else
           {
             edge_consensus(&m_own_hand, &m_target_hand, &m_params.offset, m_params.c, m_params.rho, m_params.d_min, m_params.d_max, &m_hand_velocity_reference);
             debug("Hand velocity reference: (%.2f, %.2f)", m_hand_velocity_reference.x, m_hand_velocity_reference.y);
+            vertical_control(state, &m_own_hand, &m_target_hand, m_params.offset_z, m_params.c_pz, m_params.c_vz, m_z_ref);
             if (m_params.use_barrier)
               m_speed_barrier.step(&m_hand_velocity_reference, state.u, state.psi);
           }
@@ -259,8 +274,10 @@ namespace Consensus
         {
           float z_dummy;
           WGS84::displacement(m_lat, m_lon, 0., msg->lat, msg->lon, 0., &m_target_hand.x, &m_target_hand.y, &z_dummy);
+          m_target_hand.z = msg->z;
           m_target_hand.x_dot = msg->v_x;
           m_target_hand.y_dot = msg->v_y;
+          m_target_hand.z_dot = msg->v_z;
 
           if (++m_dummy_counter >= m_params.dummy_freq)
           {
