@@ -1,0 +1,112 @@
+    <plan id="start{}" vehicle="lauv-simulator-{}">
+      <graph>
+        <node start="true" xPos="349" yPos="282">
+          <id>Goto1</id>
+          <maneuver>
+            <minTime>0</minTime>
+            <maxTime>10000</maxTime>
+            <Goto kind="automatic">
+              <finalPoint type="pointType">
+                <point>
+                  <id>id_{}</id>
+                  <name>id_{}</name>
+                  <coordinate>
+                    <latitude>{}</latitude>
+                    <longitude>{}</longitude>
+                    <height>-0.0</height>
+                  </coordinate>
+                  <z>0.0</z>
+                  <zunits>DEPTH</zunits>
+                </point>
+                <radiusTolerance>2.0</radiusTolerance>
+              </finalPoint>
+              <speed type="float" unit="MPS">1.3</speed>
+              <trajectoryTolerance>
+                <radiusTolerance>2.0</radiusTolerance>
+              </trajectoryTolerance>
+            </Goto>
+          </maneuver>
+          <actions>
+            <start-actions>
+              <messages>
+                <SetEntityParameters imcv="5.4.30" time="1.6934937318E9" src="0" dst="65535" src_ent="0" dst_ent="255">
+                  <name>Path Control</name>
+                  <params>
+                    <EntityParameter>
+                      <name>Bottom Track -- Minimum Depth</name>
+                      <value>0.0</value>
+                    </EntityParameter>
+                  </params>
+                </SetEntityParameters>
+                <SetEntityParameters imcv="5.4.30" time="1.6934937318E9" src="0" dst="65535" src_ent="0" dst_ent="255">
+                  <name>LBL</name>
+                  <params>
+                    <EntityParameter>
+                      <name>Active</name>
+                      <value>true</value>
+                    </EntityParameter>
+                  </params>
+                </SetEntityParameters>
+              </messages>
+            </start-actions>
+          </actions>
+        </node>
+        <node start="false" xPos="349" yPos="282">
+          <id>Goto2</id>
+          <maneuver>
+            <minTime>0</minTime>
+            <maxTime>10000</maxTime>
+            <Goto kind="automatic">
+              <finalPoint type="pointType">
+                <point>
+                  <id>id_{}</id>
+                  <name>id_{}</name>
+                  <coordinate>
+                    <latitude>{}</latitude>
+                    <longitude>{}</longitude>
+                    <height>-0.0</height>
+                  </coordinate>
+                  <z>0.0</z>
+                  <zunits>DEPTH</zunits>
+                </point>
+                <radiusTolerance>2.0</radiusTolerance>
+              </finalPoint>
+              <speed type="float" unit="MPS">1.3</speed>
+              <trajectoryTolerance>
+                <radiusTolerance>2.0</radiusTolerance>
+              </trajectoryTolerance>
+            </Goto>
+          </maneuver>
+          <actions>
+            <start-actions>
+              <messages>
+                <SetEntityParameters imcv="5.4.30" time="1.693493761873E9" src="0" dst="65535" src_ent="0" dst_ent="255">
+                  <name>Path Control</name>
+                  <params>
+                    <EntityParameter>
+                      <name>Bottom Track -- Minimum Depth</name>
+                      <value>0.0</value>
+                    </EntityParameter>
+                  </params>
+                </SetEntityParameters>
+                <SetEntityParameters imcv="5.4.30" time="1.693493761873E9" src="0" dst="65535" src_ent="0" dst_ent="255">
+                  <name>LBL</name>
+                  <params>
+                    <EntityParameter>
+                      <name>Active</name>
+                      <value>true</value>
+                    </EntityParameter>
+                  </params>
+                </SetEntityParameters>
+              </messages>
+            </start-actions>
+          </actions>
+        </node>
+        <edge>
+          <id>id_{}</id>
+          <source>Goto1</source>
+          <target>Goto2</target>
+          <guard>ManeuverIsDone</guard>
+        </edge>
+      </graph>
+    </plan>

@@ -578,9 +578,9 @@ namespace Plan
       void
       processRequest(const IMC::PlanControl* pc)
       {
-        if (pc->getDestination() != getSystemId()
-            && pc->getDestination() != m_ctx.resolver.resolve("broadcast"))
-        return;
+        //if (pc->getDestination() != getSystemId()
+        //    && pc->getDestination() != m_ctx.resolver.resolve("broadcast"))
+        //return;
 
         m_reply.setDestination(pc->getSource());
         m_reply.setDestinationEntity(pc->getSourceEntity());

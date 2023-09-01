@@ -160,8 +160,8 @@ main(int argc, char** argv)
       fprintf(stdout, "  [P]: PlanControl, PlanGeneration, PopEntityParameters, PowerChannelControl,\n");
       fprintf(stdout, "       PowerChannelState, PushEntityParameters\n");
       fprintf(stdout, "  [Q]: QueryEntityInfo, QueryEntityParameters\n");
-      fprintf(stdout, "  [R]: RegisterManeuver, RemoteActions, RemoteActionsRequest, ReplayControl, ReportControl,\n");
-      fprintf(stdout, "       RestartSystem\n");
+      fprintf(stdout, "  [R]: Reference, RegisterManeuver, RemoteActions, RemoteActionsRequest, ReplayControl,\n");
+      fprintf(stdout, "       ReportControl, RestartSystem\n");
       fprintf(stdout, "  [S]: SaveEntityParameters, SetEntityParameters, SetLedBrightness, SetServoPosition,\n");
       fprintf(stdout, "       SetThrusterActuation, Sms, SoundSpeed\n");
       fprintf(stdout, "  [T]: Target, TeleoperationDone, Temperature, TextMessage, TransmissionRequest, TrexCommand\n");
@@ -699,6 +699,16 @@ main(int argc, char** argv)
     IMC::QueryEntityParameters* tmsg = new IMC::QueryEntityParameters;
     msg = tmsg;
     tmsg->name = argv[4];
+  }
+
+  if (strcmp(argv[3], "Reference") == 0)
+  {
+    IMC::Reference* tmsg = new IMC::Reference;
+    msg = tmsg;
+    tmsg->lat = Angles::radians(atof(argv[4]));
+    tmsg->lon = Angles::radians(atof(argv[5]));
+    tmsg->setSource(23395);
+    tmsg->setSourceEntity(8);
   }
 
   if (strcmp(argv[3], "RegisterManeuver") == 0)
