@@ -36,11 +36,11 @@
 
 namespace Consensus
 {
-  //! Consensus for vehicles with virtual leader
+  //! Agent (node) in the consensus algorithm
   //!
-  //! Implements the edge-based consensus algorithm for nodes that have access to the virtual leader.
+  //! Implements the edge-based consensus algorithm for both leaders and followers.
   //! @author Josef Matous
-  namespace ConsensusLeader
+  namespace ConsensusNode
   {
     using DUNE_NAMESPACES;
 
@@ -54,25 +54,39 @@ namespace Consensus
         //! Hand length
         float h;
         //! Formation-keeping proportional gain
-        float c;
+        float c_leader;
+        //! Target tracking gain
+        float c_target;
         //! Vertical proportional gain
         float c_pz;
         //! Vertical feedforward gain
         float c_vz;
-        //! Formation offset
-        Vector2D offset;
-        //! Formation offset in z
-        float offset_z;
+        //! Constraint gain
+        float rho;
+        //! Formation offset x
+        std::vector<float> offset_x;
+        //! Formation offset y
+        std::vector<float> offset_y;
+        //! Formation offset z
+        std::vector<float> offset_z;
+        //! Has access to virtual target
+        bool has_target;
+        //! Minimum safety distance
+        float d_min;
+        //! Maximum distance
+        float d_max;
         //! Maximum velocity reference
         float U_max;
         //! Minimum velocity reference
         float U_min;
         //! Maximum yaw rate reference
         float r_max;
-        //! Dummy reference lookahead
-        float dummy_h;
-        //! Dummy reference frequency
-        int dummy_freq;
+        //! Number of connected nodes
+        int n_nodes;
+        //! Leader(s) name
+        std::vector<std::string> leader_name;
+        //! Leader(s) ID
+        std::vector<uint16_t> leader_id;
         //! Use speed barrier function
         bool use_barrier;
       } m_params;
@@ -89,9 +103,7 @@ namespace Consensus
       //IMC::EstimatedState m_estate;
       double m_lat, m_lon;
       HandPosition m_target_hand;
-
-      IMC::Reference m_dummy_reference;
-      int m_dummy_counter;
+      std::vector<HandPosition> m_leader_hand;
 
       bool is_initialized; // task has received EstimatedState
       bool m_active; // External activation
@@ -104,21 +116,32 @@ namespace Consensus
       {
         bind<IMC::EstimatedState>(this);
         bind<IMC::VirtualTarget>(this);
+        bind<IMC::ConsensusPacket>(this);
 
         param("Hand Length", m_controller.h)
           .defaultValue("1");
-        param("Formation Keeping Gain", m_params.c)
+        param("Formation Keeping Gain", m_params.c_leader)
+          .defaultValue("0.1");
+        param("Target Following Gain", m_params.c_target)
           .defaultValue("0.1");
         param("Vertical Proportional Gain", m_params.c_pz)
           .defaultValue("0.5");
         param("Vertical Feedforward Gain", m_params.c_vz)
           .defaultValue("1");
-        param("Formation Offset x", m_params.offset.x)
+        param("Constraint Gain", m_params.rho)
+          .defaultValue("5");
+        param("Formation Offset x", m_params.offset_x)
           .defaultValue("0");
-        param("Formation Offset y", m_params.offset.y)
+        param("Formation Offset y", m_params.offset_y)
           .defaultValue("0");
         param("Formation Offset z", m_params.offset_z)
           .defaultValue("0");
+        param("Minimum Distance", m_params.d_min)
+          .defaultValue("5");
+        param("Maximum Distance", m_params.d_max)
+          .defaultValue("50");
+        param("Access to Target", m_params.has_target)
+          .defaultValue("false");
         param("Maximum Speed Reference", m_controller.U_max)
           .defaultValue("2");
         param("Minimum Speed Reference", m_controller.U_min)
@@ -127,10 +150,8 @@ namespace Consensus
           .defaultValue("1");
         param("Active", m_active)
           .defaultValue("false");
-        param("Dummy Reference -- Lookahead Distance", m_params.dummy_h)
-          .defaultValue("50");
-        param("Dummy Reference -- Decimation", m_params.dummy_freq)
-          .defaultValue("10");
+        param("Leaders", m_params.leader_name)
+          .defaultValue("");
         param("Use Speed Barrier", m_params.use_barrier)
           .defaultValue("false");
         param("Speed Barrier -- Gain", m_speed_barrier.m_k_u)
@@ -143,11 +164,6 @@ namespace Consensus
         is_initialized = false;
         m_z_ref.value = 0;
         m_z_ref.z_units = IMC::Z_DEPTH;
-
-        m_dummy_reference.flags = IMC::Reference::FLAG_LOCATION | IMC::Reference::FLAG_Z;
-        m_dummy_reference.setSource(0x40ca);
-        m_dummy_reference.setSourceEntity(0xff);
-        m_dummy_counter = m_params.dummy_freq;
       }
 
       void
@@ -155,11 +171,22 @@ namespace Consensus
       {
         PathController::onUpdateParameters();
 
-        m_dummy_counter = m_params.dummy_freq;
-
         if (paramChanged(m_active))
         {
           m_speed_barrier.reset();
+        }
+
+        if (paramChanged(m_params.leader_name))
+        {
+          m_params.leader_id.resize(m_params.leader_name.size());
+          m_leader_hand.resize(m_params.leader_name.size());
+          m_params.n_nodes = m_params.leader_name.size();
+
+          for (size_t i = 0; i < m_params.leader_name.size(); i++)
+          {
+             m_params.leader_id[i] = resolveSystemName(m_params.leader_name[i]);
+             debug("Leader %s resolved as %u", m_params.leader_name[i].c_str(), m_params.leader_id[i]);
+          }          
         }
 
         /*if (m_active != isActive())
@@ -221,8 +248,31 @@ namespace Consensus
             m_z_ref.z_units = IMC::Z_DEPTH;
           } else
           {
-            edge_consensus(&m_own_hand, &m_target_hand, &m_params.offset, m_params.c, &m_hand_velocity_reference);
-            vertical_control(state, &m_own_hand, &m_target_hand, m_params.offset_z, m_params.c_pz, m_params.c_vz, m_z_ref);
+            // Clear
+            m_hand_velocity_reference.x = 0.;
+            m_hand_velocity_reference.y = 0.;
+
+            // Leader following
+            float c_v = (m_params.has_target ? 0. : 1.);
+            for (size_t i = 0; i < m_params.leader_id.size(); i++)
+            {
+              edge_consensus(m_own_hand, m_leader_hand[i], m_params.offset_x[i], m_params.offset_y[i], m_params.c_leader, c_v, m_params.rho, m_params.d_min, m_params.d_max, m_hand_velocity_reference);
+              vertical_control(state, m_own_hand, m_target_hand, m_params.offset_z[i], m_params.c_pz, m_params.c_vz, m_z_ref);
+            }
+            // Normalize by the number of connected nodes
+            if (m_params.n_nodes > 1)
+            {
+              m_hand_velocity_reference.x /= m_params.n_nodes;
+              m_hand_velocity_reference.y /= m_params.n_nodes;            
+            }
+            
+            // Target following
+            if (m_params.has_target)
+            {
+              edge_consensus(m_own_hand, m_target_hand, 0., 0., m_params.c_target, m_hand_velocity_reference);
+              vertical_control(state, m_own_hand, m_target_hand, 0., m_params.c_pz, m_params.c_vz, m_z_ref);
+            }
+
             if (m_params.use_barrier)
               m_speed_barrier.step(&m_hand_velocity_reference, state.u, state.psi);
           }
@@ -247,7 +297,7 @@ namespace Consensus
       void
       consume(const IMC::VirtualTarget* msg)
       {
-        if (m_active && is_initialized)
+        if (m_params.has_target)
         {
           float z_dummy;
           WGS84::displacement(m_lat, m_lon, 0., msg->msg->lat, msg->msg->lon, 0., &m_target_hand.x, &m_target_hand.y, &z_dummy);
@@ -255,29 +305,38 @@ namespace Consensus
           m_target_hand.x_dot = msg->msg->v_x;
           m_target_hand.y_dot = msg->msg->v_y;
           m_target_hand.z_dot = msg->msg->v_z;
+        }
+      }
 
-          if (++m_dummy_counter >= m_params.dummy_freq)
+      inline int
+      find(const std::vector<uint16_t> &vector, const uint16_t &value)
+      {
+        int position = -1;
+        for (size_t i = 0; i < vector.size(); i++)
+        {
+          if (vector[i] == value)
           {
-            m_dummy_counter = 0;
-
-            float hand_velocity_norm_inv = 1. / std::sqrt(m_hand_velocity_reference.x*m_hand_velocity_reference.x 
-                                                        + m_hand_velocity_reference.y*m_hand_velocity_reference.y);
-            m_dummy_reference.lat = m_lat;
-            m_dummy_reference.lon = m_lon;
-            WGS84::displace(m_own_hand.x + m_hand_velocity_reference.x*m_params.dummy_h*hand_velocity_norm_inv, 
-                            m_own_hand.y + m_hand_velocity_reference.y*m_params.dummy_h*hand_velocity_norm_inv,
-                            &m_dummy_reference.lat, &m_dummy_reference.lon);
-            dispatch(m_dummy_reference, DF_KEEP_SRC_EID);
-            debug("Dispatching dummy");
+            position = i;
+            break;
           }
+        }
+        return position;
+      }
 
-          /*edge_consensus(&m_own_hand, &m_target_hand, &m_params.offset, m_params.c, &m_hand_velocity_reference);
-          hand_velocity_controller(&m_hand_velocity_reference, &m_estate, m_controller.h, m_params.U_max, m_params.r_max, &m_speed, &m_yaw_rate);
-
-          dispatch(m_speed);
-          dispatch(m_yaw_rate);
-          dispatch(m_z_ref);
-          debug("Dispatching references");*/
+      void
+      consume(const IMC::ConsensusPacket* msg)
+      {
+        int leader_index = find(m_params.leader_id, msg->getSource());
+        if (m_active && is_initialized && leader_index >= 0)
+        {
+          debug("Received consensus packet from %s", m_params.leader_name[leader_index].c_str());
+          float z_dummy;
+          WGS84::displacement(m_lat, m_lon, 0., msg->lat, msg->lon, 0., 
+                              &m_leader_hand[leader_index].x, &m_leader_hand[leader_index].y, &z_dummy);
+          m_leader_hand[leader_index].z = msg->z;
+          m_leader_hand[leader_index].x_dot = msg->v_x;
+          m_leader_hand[leader_index].y_dot = msg->v_y;
+          m_leader_hand[leader_index].z_dot = msg->v_z;
         }
       }
     };    

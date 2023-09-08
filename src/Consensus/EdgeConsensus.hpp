@@ -62,37 +62,39 @@ namespace Consensus
   
   //! Consensus algorithm with connectivity and collision constraints
   inline void
-  edge_consensus(const HandPosition* h_self, const HandPosition* h_target, const Vector2D* z_d, float c, float rho, float d_min, float d_max, Vector2D* u)
+  edge_consensus(const HandPosition& h_self, const HandPosition& h_target, float x_offset, float y_offset, float c_p, float c_v, float rho, float d_min, float d_max, Vector2D& u)
   {
-    Vector2D z; // relative position
-    z.x = h_self->x - h_target->x;
-    z.y = h_self->y - h_target->y;
+    Vector2D z, z_d; // relative position
+    z.x = h_self.x - h_target.x;
+    z.y = h_self.y - h_target.y;
+    z_d.x = x_offset;
+    z_d.y = y_offset;
 
-    float dW = constraint_gradient(&z, z_d, d_min, d_max);
+    float dW = constraint_gradient(&z, &z_d, d_min, d_max);
 
-    u->x = c*(z_d->x - z.x) - c*rho*dW*z.x + h_target->x_dot;
-    u->y = c*(z_d->y - z.y) - c*rho*dW*z.y + h_target->y_dot;
-    //u->x = c*(z_d->x - z.x) + h_target->x_dot;
-    //u->y = c*(z_d->y - z.y) + h_target->y_dot;
+    u.x += c_p*(z_d.x - z.x) - c_p*rho*dW*z.x + c_v*h_target.x_dot;
+    u.y += c_p*(z_d.y - z.y) - c_p*rho*dW*z.y + c_v*h_target.y_dot;
   }
 
   //! Consensus algorithm without connectivity and collision constraints
   inline void
-  edge_consensus(const HandPosition* h_self, const HandPosition* h_target, const Vector2D* z_d, float c, Vector2D* u)
+  edge_consensus(const HandPosition& h_self, const HandPosition& h_target, float x_offset, float y_offset, float c, Vector2D& u)
   {
-    Vector2D z; // relative position
-    z.x = h_self->x - h_target->x;
-    z.y = h_self->y - h_target->y;
+    Vector2D z, z_d; // relative position
+    z.x = h_self.x - h_target.x;
+    z.y = h_self.y - h_target.y;
+    z_d.x = x_offset;
+    z_d.y = y_offset;
 
-    u->x = c*(z_d->x - z.x) + h_target->x_dot;
-    u->y = c*(z_d->y - z.y) + h_target->y_dot;
+    u.x += c*(z_d.x - z.x) + h_target.x_dot;
+    u.y += c*(z_d.y - z.y) + h_target.y_dot;
   }
 
   //! Vertical controller
   inline void
-  vertical_control(const IMC::EstimatedState& state, const HandPosition* h_self, const HandPosition* h_target, float z_d, float c_pz, float c_vz, IMC::DesiredZ& z_ref)
+  vertical_control(const IMC::EstimatedState& state, const HandPosition& h_self, const HandPosition& h_target, float z_d, float c_pz, float c_vz, IMC::DesiredZ& z_ref)
   {
-    float z = h_target->z + z_d + c_pz*(h_target->z - h_self->z) + c_vz*h_target->z_dot + (state.z - h_self->z);
+    float z = h_target.z + z_d + c_pz*(h_target.z - h_self.z) + c_vz*h_target.z_dot + (state.z - h_self.z);
     z_ref.z_units = IMC::Z_DEPTH;
     z_ref.value = trimValue(z, 0., 20.);
   }
