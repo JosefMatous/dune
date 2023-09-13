@@ -18,15 +18,19 @@ $DUNE_ACTIVATE localhost 6003 "Consensus Message" false
 # Simulator 3
 $DUNE_SENDMSG localhost 6004 PlanControl 1 goto3 0
 $DUNE_ACTIVATE localhost 6004 "Path Control" false
+$DUNE_ACTIVATE localhost 6004 "Consensus Message" false
 
 # Simulator 4
 $DUNE_SENDMSG localhost 6005 PlanControl 1 goto4 0
 $DUNE_ACTIVATE localhost 6005 "Path Control" false
+$DUNE_ACTIVATE localhost 6005 "Consensus Message" false
 
 # Simulator 5
 $DUNE_SENDMSG localhost 6006 PlanControl 1 goto5 0
 $DUNE_ACTIVATE localhost 6006 "Path Control" false
+$DUNE_ACTIVATE localhost 6006 "Consensus Message" false
 
 # Simulator 6
 $DUNE_SENDMSG localhost 6015 PlanControl 1 goto6 0
 $DUNE_ACTIVATE localhost 6015 "Path Control" false
+$DUNE_ACTIVATE localhost 6015 "Consensus Message" false
