@@ -426,18 +426,28 @@ main(int argc, char** argv)
       tmsg->op = ExperimentControl::OP_STOP;
     if (strcmp(argv[5], "path_following") == 0)
       tmsg->experiment = ExperimentControl::EX_PATH_FOLLOWING;
+    else if (strcmp(argv[5], "nsb_ellipse") == 0)
+      tmsg->experiment = ExperimentControl::EX_NSB_ELLIPSE;
     else
-      tmsg->experiment = ExperimentControl::EX_NSB;
-    if (argc == 7)
+      tmsg->experiment = ExperimentControl::EX_NSB_WP;
+    if (argc >= 7)
     {
-    if (strcmp(argv[6], "true") == 0)
-      tmsg->obstacle = IMC::BOOL_TRUE;
-    else
-      tmsg->obstacle = IMC::BOOL_FALSE;
+      if (strcmp(argv[6], "true") == 0)
+        tmsg->obstacle = IMC::BOOL_TRUE;
+      else
+        tmsg->obstacle = IMC::BOOL_FALSE;
     }
     else
     {
       tmsg->obstacle = IMC::BOOL_FALSE;
+    }
+    if (argc >= 8)
+    {
+      tmsg->delay = atof(argv[7]);
+    }
+    else
+    {
+      tmsg->delay = 0.;
     }
   }
 

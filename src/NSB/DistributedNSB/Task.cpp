@@ -50,7 +50,8 @@ namespace NSB
 
     struct Task: public DUNE::Tasks::Task
     {
-      Ellipse m_path;
+      Ellipse m_ellipse_path;
+      Waypoints m_waypoint_path;
       LineOfSight m_los;
       FormationKeepingSaturated m_form;
       Delta m_last_step;
@@ -70,7 +71,7 @@ namespace NSB
       bool m_has_obstacle;
 
       // External activation
-      bool m_active;
+      bool m_active, m_use_ellipse;
       bool is_initialized, has_estate;
 
       double m_T_start, m_T_stop, m_param_stop;
@@ -81,7 +82,7 @@ namespace NSB
       //! @param[in] ctx context.
       Task(const std::string& name, Tasks::Context& ctx):
         DUNE::Tasks::Task(name, ctx),
-        m_path(0, 0, 0., 50., 30., 0., 0, 0., false, M_PI_2, 0.),
+        m_ellipse_path(0, 0, 0., 50., 30., 0., 0, 0., false, M_PI_2, 0.),
         m_los(15., false, 1.3, 0.5),
         m_form(0., 0., 0., 0.25, 0.5)
       {
@@ -98,7 +99,6 @@ namespace NSB
         has_estate = false;
 
         m_stop_experiment.op = ExperimentControl::OP_STOP;
-        m_stop_experiment.experiment = ExperimentControl::EX_NSB;
         m_stop_experiment.obstacle = IMC::BOOL_TRUE;
         m_stop_experiment.delay = 0.;
 
@@ -173,11 +173,17 @@ namespace NSB
       {
         if (msg->delay <= 0.)
         {
-          bool new_active = (msg->op == ExperimentControl::OP_START && msg->experiment == ExperimentControl::EX_NSB);
-          if (new_active != m_active)
+          if (msg->experiment == ExperimentControl::EX_NSB_ELLIPSE || msg->experiment == ExperimentControl::EX_NSB_WP)
           {
-            m_active = new_active;
-            onActiveChanged();
+
+            bool new_active = (msg->op == ExperimentControl::OP_START);
+            m_use_ellipse = (msg->experiment == ExperimentControl::EX_NSB_ELLIPSE);
+            m_stop_experiment.experiment = msg->experiment;
+            if (new_active != m_active)
+            {
+              m_active = new_active;
+              onActiveChanged();
+            }
           }
         }
       }
@@ -186,7 +192,10 @@ namespace NSB
       consume(const IMC::NSBParameters* msg)
       {
         if (has_estate)
-          updatePathParameters(msg, m_path, m_lat0, m_lon0);
+        {
+          updateEllipsePathParameters(msg, m_ellipse_path, m_lat0, m_lon0);
+          updateWaypointPathParameters(msg, m_waypoint_path, m_lat0, m_lon0);
+        }
         updateLosParameters(msg, m_los);
         updateFormationKeeping(msg, m_form);
         updateObstacleAvoidance(msg, m_obs_avoid);      
@@ -215,6 +224,9 @@ namespace NSB
       void
       consume(const IMC::EstimatedState* msg)
       {
+        if (msg->getSource() != getSystemId())
+          return;
+
         m_lat0 = msg->lat;
         m_lon0 = msg->lon;
         if (!has_estate)
@@ -225,10 +237,14 @@ namespace NSB
         if (isActive() && is_initialized)
         {
           GeometricPath::PathReference path_ref;
-          m_path.getPathReference(m_nsb_state.path_param, path_ref);
+          if (m_use_ellipse)
+            m_ellipse_path.getPathReference(m_nsb_state.path_param, path_ref);
+          else
+            m_waypoint_path.getPathReference(m_nsb_state.path_param, path_ref);
 
           //debug("Vehicle at x = %.2f, y = %.2f", msg->x, msg->y);
           //debug("Path reference: x = %.2f, y = %.2f, z = %.2f", path_ref.x, path_ref.y, path_ref.z);
+          //debug("Barycenter at [%.2f, %.2f, %.2f]", m_nsb_state.x, m_nsb_state.y, m_nsb_state.z);
           //debug("Path parameter %.3f", m_current_state.nsb_state.path_param);
 
           Vector3D path_err;
@@ -236,15 +252,18 @@ namespace NSB
           LineOfSight::LineOfSightOutput los_out;
           m_los.step(path_ref, path_err, los_out);
 
-          //debug("Path error: x = %.2f, y = %.2f", path_err.x, path_err.y);
+          //debug("Path-following error: x = %.2f, y = %.2f, z = %.2f", path_err.x, path_err.y, path_err.z);
           //debug("LOS vector: x = %.2f, y = %.2f, z = %.2f", los_out.velocity.x, los_out.velocity.y, los_out.velocity.z);
 
           if (m_has_obstacle)
           {
             m_obs_est.simulate(Clock::getSinceEpoch());
-            //debug("Obstacle at x = %.2f, y = %.2f. Speed v_x = %.2f, v_y = %.2f", m_obs_est.m_obstacle_state.x, m_obs_est.m_obstacle_state.y, m_obs_est.m_obstacle_state.vx, m_obs_est.m_obstacle_state.vy);
+            /*for (auto pair: m_obs_est.m_obstacle_states)
+            {
+              debug("Obstacle at x = %.2f, y = %.2f. Speed v_x = %.2f, v_y = %.2f", pair.second.x, pair.second.y, pair.second.vx, pair.second.vy);
+            }*/
             m_obs_avoid.step(m_nsb_state.x, m_nsb_state.y, 
-                            m_obs_est.m_obstacle_state, m_nsb_state.r_f, los_out);
+                            m_obs_est.m_obstacle_states, m_nsb_state.r_f, los_out);
             //debug("LOS vector after OA: x = %.2f, y = %.2f, z = %.2f", los_out.velocity.x, los_out.velocity.y, los_out.velocity.z);
           }
 

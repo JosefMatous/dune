@@ -64,7 +64,7 @@ namespace NSB
         }
 
         inline static void
-        getPathReference(PathPoint point, PathReference& ref)
+        getPathReference(const PathPoint& point, PathReference& ref)
         {
           ref.x = point.p.x;
           ref.y = point.p.y;
@@ -85,7 +85,7 @@ namespace NSB
         }
 
         inline static void
-        getPathFollowingError(PathReference ref, double x_vehicle, double y_vehicle, double z_vehicle, Vector3D& path_err)
+        getPathFollowingError(const PathReference& ref, double x_vehicle, double y_vehicle, double z_vehicle, Vector3D& path_err)
         {
           // Get displacement in NED frame
           double x_ned, y_ned, z_ned;
@@ -105,7 +105,7 @@ namespace NSB
         }
 
         inline static void
-        getPathFollowingError(PathReference ref, const IMC::EstimatedState* estate, Vector3D& path_err)
+        getPathFollowingError(const PathReference& ref, const IMC::EstimatedState* estate, Vector3D& path_err)
         {
           getPathFollowingError(ref, estate->x, estate->y, estate->depth, path_err);
         }
@@ -198,6 +198,253 @@ namespace NSB
             p.p_ddiff.z = 0.;
           }
         }
+    };
+
+    class Waypoints: public GeometricPath
+    {
+    protected:
+      //! Waypoint x-coordinates
+      std::vector<double> wp_x;
+      //! Waypoint y-coordinates
+      std::vector<double> wp_y;
+      //! Waypoint z-coordinates
+      std::vector<double> wp_z;
+      //! Distances between waypoints
+      std::vector<double> distance;
+      //! Cumulative sum of distances between waypoints
+      std::vector<double> distance_cumsum;
+
+      //! Radius of the Dubins segments
+      double R_dub;
+
+      struct DubinsSegment
+      {
+        //! Origin of the circle
+        Vector3D p0;
+        //! Unit vectors that define the circle
+        Vector3D e1, e2;
+        //! Angle of the arc
+        double alpha;
+        //! Length of the Dubins segment
+        double L;
+      };
+
+      //! List of DubinsSegment that define the arcs between the waypoints
+      std::vector<DubinsSegment> segments;
+      //! Updates the list of Dubins path segments. Returns true if successful
+      void
+      updateDubinsSegments(void)
+      {
+        if (getNumberOfWaypoints() < 3) // There are no circular segments; exit
+        {
+          segments.clear();
+          return;
+        }
+
+        segments.resize(getNumberOfWaypoints() - 2);
+        for (size_t i = 0; i < segments.size(); i++)
+        {
+          // Normalized relative vectors between the three waypoints that form the segment
+          Vector3D p_21, p_32;
+          p_21.x = (wp_x[i+1] - wp_x[i]) / distance[i];
+          p_21.y = (wp_y[i+1] - wp_y[i]) / distance[i];
+          p_21.z = (wp_z[i+1] - wp_z[i]) / distance[i];
+          p_32.x = (wp_x[i+2] - wp_x[i+1]) / distance[i+1];
+          p_32.y = (wp_y[i+2] - wp_y[i+1]) / distance[i+1];
+          p_32.z = (wp_z[i+2] - wp_z[i+1]) / distance[i+1];
+
+          // Angle of the arc = arccos(dot(p_21, p_32))
+          double temp = dot(p_21, p_32);
+          segments[i].alpha = std::acos(temp);
+          // Length of the Dubins segment = R * tan(alpha / 2)
+          segments[i].L = R_dub * std::tan(segments[i].alpha * 0.5);
+          // Non-normalized e_1 = p_21 .* dot(p_21, p_32) - p_32
+          segments[i].e1.x = p_21.x * temp - p_32.x;
+          segments[i].e1.y = p_21.y * temp - p_32.y;
+          segments[i].e1.z = p_21.z * temp - p_32.z;
+          temp = norm(segments[i].e1);
+          segments[i].e1.x /= temp;
+          segments[i].e1.y /= temp;
+          segments[i].e1.z /= temp;
+          // e_2 = p_21
+          segments[i].e2.x = p_21.x;
+          segments[i].e2.y = p_21.y;
+          segments[i].e2.z = p_21.z;
+          // Origin of the circle: p0 = waypoint[i+1] - R*e_1 - L*e_2
+          segments[i].p0.x = wp_x[i+1] - R_dub*segments[i].e1.x - segments[i].L*segments[i].e2.x;
+          segments[i].p0.y = wp_y[i+1] - R_dub*segments[i].e1.y - segments[i].L*segments[i].e2.y;
+          segments[i].p0.z = wp_z[i+1] - R_dub*segments[i].e1.z - segments[i].L*segments[i].e2.z;
+        }
+      }
+
+      void
+      evaluateArc(double s_rel, size_t index, PathPoint& p)
+      {
+        double s_multiplier = segments[index].alpha / (2*segments[index].L);
+        double c = std::cos(s_rel * s_multiplier);
+        double s = std::sin(s_rel * s_multiplier);
+        p.p.x = segments[index].p0.x + R_dub * (segments[index].e1.x*c + segments[index].e2.x*s);
+        p.p.y = segments[index].p0.y + R_dub * (segments[index].e1.y*c + segments[index].e2.y*s);
+        p.p.z = segments[index].p0.z + R_dub * (segments[index].e1.z*c + segments[index].e2.z*s);
+        p.p_diff.x = R_dub * s_multiplier * (-segments[index].e1.x*s + segments[index].e2.x*c);
+        p.p_diff.y = R_dub * s_multiplier * (-segments[index].e1.y*s + segments[index].e2.y*c);
+        p.p_diff.z = R_dub * s_multiplier * (-segments[index].e1.z*s + segments[index].e2.z*c);
+        p.p_ddiff.x = -R_dub * square(s_multiplier) * (segments[index].e1.x*c + segments[index].e2.x*s);
+        p.p_ddiff.y = -R_dub * square(s_multiplier) * (segments[index].e1.y*c + segments[index].e2.y*s);
+        p.p_ddiff.z = -R_dub * square(s_multiplier) * (segments[index].e1.z*c + segments[index].e2.z*s);
+      }
+      
+    public:
+      //! Creates an empty Waypoints class
+      Waypoints(void) {}
+
+      //! Initialize with a given set of waypoints
+      Waypoints(const std::vector<double>& x, const std::vector<double>& y, const std::vector<double>& z, double R) 
+      { 
+        R_dub = R;
+        setWaypoints(x, y, z); 
+      }
+
+      void
+      setDubinsRadius(double R)
+      {
+        R_dub = R;
+        updateDubinsSegments();
+      }
+      
+      bool
+      setWaypoints(const std::vector<double>& x, const std::vector<double>& y, const std::vector<double>& z)
+      {
+        if (x.size() == 0) // waypoints are empty
+        {
+          wp_x.clear();
+          wp_y.clear();
+          wp_z.clear();
+          distance_cumsum.clear();
+          return true;
+        }
+        if ((x.size() != y.size()) || (x.size() != z.size())) // Size of x, y and z must match
+          return false; 
+
+        // Assign new values
+        wp_x = x;
+        wp_y = y;
+        wp_z = z;
+
+        // Calculate the cumulative sum of distances
+        double delta_x, delta_y, delta_z, dist, cumsum(0.);
+        size_t N = wp_x.size() - 1;
+        distance.clear();
+        distance.resize(N);
+        distance_cumsum.clear();
+        distance_cumsum.resize(N);
+        for (size_t i = 0; i < N; i++)
+        {
+          delta_x = wp_x[i+1] - wp_x[i];
+          delta_y = wp_y[i+1] - wp_y[i];
+          delta_z = wp_z[i+1] - wp_z[i];
+          dist = std::sqrt(square(delta_x) + square(delta_y) + square(delta_z));
+          cumsum += dist;
+
+          distance[i] = dist;
+          distance_cumsum[i] = cumsum;
+        }
+
+        updateDubinsSegments();
+
+        return true;
+      }
+
+      double
+      getPathLength(void)
+      {
+        if (distance_cumsum.size() > 0)
+          return distance_cumsum[distance_cumsum.size() - 1];
+        else
+          return 0;
+      }
+
+      inline size_t
+      getNumberOfWaypoints(void)
+      {
+        return wp_x.size();
+      }
+
+      inline size_t
+      findWaypointIndex(double s)
+      {
+        size_t index;
+        if (s >= distance_cumsum[distance_cumsum.size()-1]) // Path parameter out of bounds
+        {
+          index = distance_cumsum.size() - 1;
+        }
+        else // Find the closest smallest value in distance_cumsum
+        {
+          index = 0;
+          while ((s >= distance_cumsum[index])) // This loop finds the first index where distance_cumsum is greater than s
+          {
+            index++;
+          }
+        }
+        return index;
+      }
+        
+      inline void
+      evaluatePathFunction(double s, PathPoint& p)
+      {
+        // Empty waypoint list
+        if (distance_cumsum.size() == 0)
+          return;
+
+        // Find the waypoint segment
+        size_t index = findWaypointIndex(s);
+
+        // Evaluate the path
+        double s_rel = s;
+        double distance_inverse = std::pow(distance[index], -1.);
+
+        // First, check if we are on the arcs
+        if (getNumberOfWaypoints() > 2)
+        {
+          if (index > 0)
+          {
+            s_rel -= distance_cumsum[index-1];
+            // Arc at the beginning of a segment
+            if (s_rel < segments[index-1].L)
+            {
+              s_rel += segments[index-1].L;
+              evaluateArc(s_rel, index-1, p);
+              return;
+            }
+          }
+          // Arc at the end of a segment
+          if (index < getNumberOfWaypoints() - 2)
+          {
+            if (s_rel > (distance[index] - segments[index].L))
+            {
+              s_rel -= (distance[index] - segments[index].L);
+              evaluateArc(s_rel, index, p);
+              return;
+            }
+          }
+        }
+
+        // If the execution falls through here, we are evaluating the straight-line segment
+        s_rel *= distance_inverse;
+
+        // Calculate the path point
+        p.p.x = (1 - s_rel) * wp_x[index] + s_rel * wp_x[index + 1];
+        p.p.y = (1 - s_rel) * wp_y[index] + s_rel * wp_y[index + 1];
+        p.p.z = (1 - s_rel) * wp_z[index] + s_rel * wp_z[index + 1];
+        // Calculate the partial derivative
+        p.p_diff.x = (wp_x[index + 1] - wp_x[index]) * distance_inverse;
+        p.p_diff.y = (wp_y[index + 1] - wp_y[index]) * distance_inverse;
+        p.p_diff.z = (wp_z[index + 1] - wp_z[index]) * distance_inverse;
+        // The second partial is zero
+        p.p_ddiff.x = 0.;
+        p.p_ddiff.y = 0.;
+        p.p_ddiff.z = 0.;
+      }
     };
 }
 

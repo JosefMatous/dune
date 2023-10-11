@@ -329,7 +329,11 @@ namespace NSB
         // Course controller
         float chi_ref = std::atan2(m_desired_velocity.y, m_desired_velocity.x); // desired course
         float chi_err = Angles::normalizeRadian(chi_ref - std::atan2(state.vy, state.vx));
-        float h_pid = m_horizontal_pid.step(ts.delta, chi_err, 0.);        
+        float h_pid = 0;
+        if (std::abs(chi_err) < M_PI_2)
+          h_pid = m_horizontal_pid.step(ts.delta, chi_err, 0.);        
+        else
+          m_horizontal_pid.reset();
         m_yaw.value = Angles::normalizeRadian(chi_ref + h_pid);
         dispatch(m_yaw);
 

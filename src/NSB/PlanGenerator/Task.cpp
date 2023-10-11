@@ -50,7 +50,8 @@ namespace NSB
 
     struct Task: public DUNE::Tasks::Periodic
     {
-      Ellipse m_path;
+      Ellipse m_ellipse_path;
+      Waypoints m_waypoint_path;
       LineOfSight m_los;
       FormationKeepingSaturated m_form;
 
@@ -64,13 +65,14 @@ namespace NSB
         double x, y, z;
       } m_vehicle_state;
 
-      ObstacleState m_obstacle_state;
+      std::map<uint16_t, ObstacleState> m_obstacle_states;
+      std::vector<double> m_obstacle_x0, m_obstacle_y0;
 
       struct
       {
         std::vector<double> p_vehicle;
         std::vector<double> p_barycenter;
-        bool use_obstacle;
+        bool use_obstacle, use_ellipse;
         double delta_t;
         std::vector<double> waypoint_param;
         std::string plan_name;
@@ -97,7 +99,7 @@ namespace NSB
       //! @param[in] ctx context.
       Task(const std::string& name, Tasks::Context& ctx):
         DUNE::Tasks::Periodic(name, ctx),
-        m_path(0, 0, 0., 50., 30., 0., 0, 0., false, M_PI_2, 0.),
+        m_ellipse_path(0, 0, 0., 50., 30., 0., 0, 0., false, M_PI_2, 0.),
         m_los(15., false, 1.3, 0.5),
         m_form(0., 0., 0., 0.25, 0.5)
       {
@@ -123,6 +125,9 @@ namespace NSB
         param("Station Keeping -- Radius", m_params.start_radius)
           .defaultValue("5");
 
+        param("Use Ellipse", m_params.use_ellipse)
+          .defaultValue("true");          
+
         param("Vehicle -- Initial Position", m_params.p_vehicle)
           .defaultValue("0.7188233, -0.1519519, 0")
           .size(3)
@@ -142,12 +147,12 @@ namespace NSB
       inline void
       debugExternalParameters(void)
       {
-        debug("Ellipse -- Origin [%.2f, %.2f, %.2f]", m_path.m_x_center, m_path.m_y_center, m_path.m_z_center);
-        debug("Ellipse -- Axes   [%.2f, %.2f, %.2f]", m_path.m_a, m_path.m_b, m_path.m_c);
-        debug("Ellipse -- Clockwise %u", m_path.m_clockwise);
-        debug("Ellipse -- Orientation %.3f", m_path.m_psi);
-        debug("Ellipse -- Frequency %.1f", m_path.m_z_freq);
-        debug("Ellipse -- Initial Phases [%.3f, %.3f]", m_path.m_phi0, m_path.m_z_phi0);
+        debug("Ellipse -- Origin [%.2f, %.2f, %.2f]", m_ellipse_path.m_x_center, m_ellipse_path.m_y_center, m_ellipse_path.m_z_center);
+        debug("Ellipse -- Axes   [%.2f, %.2f, %.2f]", m_ellipse_path.m_a, m_ellipse_path.m_b, m_ellipse_path.m_c);
+        debug("Ellipse -- Clockwise %u", m_ellipse_path.m_clockwise);
+        debug("Ellipse -- Orientation %.3f", m_ellipse_path.m_psi);
+        debug("Ellipse -- Frequency %.1f", m_ellipse_path.m_z_freq);
+        debug("Ellipse -- Initial Phases [%.3f, %.3f]", m_ellipse_path.m_phi0, m_ellipse_path.m_z_phi0);
 
         debug("LOS -- Lookahead Distance %f", m_los.m_lookahead);
         debug("LOS -- Speed %f", m_los.m_speed);
@@ -167,7 +172,7 @@ namespace NSB
         m_nsb_state.r_f = std::sqrt(square(m_vehicle_state.x - m_nsb_state.x) + square(m_vehicle_state.y - m_nsb_state.y));
       }
 
-      inline void
+      void
       reset_state(void)
       {
         WGS84::displacement(m_lat0, m_lon0, 0., m_params.p_vehicle[0], m_params.p_vehicle[1], 0., &m_vehicle_state.x, &m_vehicle_state.y);
@@ -175,8 +180,14 @@ namespace NSB
         m_nsb_state.path_param = 0.;
         WGS84::displacement(m_lat0, m_lon0, 0., m_params.p_barycenter[0], m_params.p_barycenter[1], 0., &m_nsb_state.x, &m_nsb_state.y);
         m_nsb_state.z = m_params.p_barycenter[2];
-        WGS84::displacement(m_lat0, m_lon0, 0., m_lat_obs, m_lon_obs, 0., &m_obstacle_state.x, &m_obstacle_state.y);
-        m_obstacle_state.timestamp = 0.;
+        double obstacle_x0, obstacle_y0;
+        WGS84::displacement(m_lat0, m_lon0, 0., m_lat_obs, m_lon_obs, 0., &obstacle_x0, &obstacle_y0);
+        for (size_t i = 0; i < m_obstacle_states.size(); i++)
+        {
+          m_obstacle_states[i].x = obstacle_x0 + m_obstacle_x0[i];
+          m_obstacle_states[i].y = obstacle_y0 + m_obstacle_y0[i];
+          m_obstacle_states[i].timestamp = 0.;
+        }
         updateFormationRadius();
       }
 
@@ -213,17 +224,28 @@ namespace NSB
       consume(const IMC::NSBParameters* msg)
       {
         // Set the latitude and longitude of the desired path as the origin of the NED frame.
-        m_lat0 = msg->path_lat;
-        m_lon0 = msg->path_lon;
-        updatePathParameters(msg, m_path, m_lat0, m_lon0);
+        m_lat0 = msg->ellipse_path_lat;
+        m_lon0 = msg->ellipse_path_lon;
+        updateEllipsePathParameters(msg, m_ellipse_path, m_lat0, m_lon0);
+        updateWaypointPathParameters(msg, m_waypoint_path, m_lat0, m_lon0);
+
         updateLosParameters(msg, m_los);
         updateFormationKeeping(msg, m_form);
         updateObstacleAvoidance(msg, m_obs_avoid);
         // Update obstacle
         m_lat_obs = msg->obs_lat;
         m_lon_obs = msg->obs_lon;
-        m_obstacle_state.vx = msg->obs_vx;
-        m_obstacle_state.vy = msg->obs_vy;
+        castLexical(msg->obs_x, m_obstacle_x0);
+        castLexical(msg->obs_y, m_obstacle_y0);
+        std::vector<double> obs_vx, obs_vy;
+        castLexical(msg->obs_vx, obs_vx);
+        castLexical(msg->obs_vy, obs_vy);
+        size_t N = obs_vx.size();
+        for (size_t i = 0; i < N; i++)
+        {
+          m_obstacle_states[i].vx = obs_vx[i];
+          m_obstacle_states[i].vy = obs_vy[i];
+        }
       
         //debugExternalParameters();
         reset();        
@@ -271,17 +293,23 @@ namespace NSB
       simulator_step(double& t)
       {
         GeometricPath::PathReference path_ref;
-        m_path.getPathReference(m_nsb_state.path_param, path_ref);
+        if (m_params.use_ellipse)
+          m_ellipse_path.getPathReference(m_nsb_state.path_param, path_ref);
+        else
+          m_waypoint_path.getPathReference(m_nsb_state.path_param, path_ref);
         //debug("Path at [%.2f, %.2f, %.2f]", path_ref.x, path_ref.y, path_ref.z);
+        //debug("Barycenter at [%.2f, %.2f, %.2f]", m_nsb_state.x, m_nsb_state.y, m_nsb_state.z);
 
         Vector3D path_err;
         GeometricPath::getPathFollowingError(path_ref, m_nsb_state.x, m_nsb_state.y, m_nsb_state.z, path_err);
+        //debug("Path-following error: x = %.2f, y = %.2f, z = %.2f", path_err.x, path_err.y, path_err.z);
         LineOfSight::LineOfSightOutput los_out;
         m_los.step(path_ref, path_err, los_out);
+        //debug("LOS vector: x = %.2f, y = %.2f, z = %.2f", los_out.velocity.x, los_out.velocity.y, los_out.velocity.z);
 
         if (m_params.use_obstacle)
         {
-          m_obs_avoid.step(m_nsb_state.x, m_nsb_state.y, m_obstacle_state, m_nsb_state.r_f, los_out);
+          m_obs_avoid.step(m_nsb_state.x, m_nsb_state.y, m_obstacle_states, m_nsb_state.r_f, los_out, this);
           //debug("LOS vector after OA: x = %.2f, y = %.2f, z = %.2f", los_out.velocity.x, los_out.velocity.y, los_out.velocity.z);
         }
 
@@ -299,8 +327,11 @@ namespace NSB
         t += m_params.delta_t;
         if (m_params.use_obstacle)
         {
-          m_obstacle_state.x += m_obstacle_state.vx * m_params.delta_t;
-          m_obstacle_state.y += m_obstacle_state.vy * m_params.delta_t;
+          for (size_t i = 0; i < m_obstacle_x0.size(); i++)
+          {
+            m_obstacle_states[i].x += m_obstacle_states[i].vx * m_params.delta_t;
+            m_obstacle_states[i].y += m_obstacle_states[i].vy * m_params.delta_t;
+          }
         }
         m_nsb_state.path_param += los_out.path_parameter_derivative * m_params.delta_t;
         m_nsb_state.x += los_out.velocity.x * m_params.delta_t;
@@ -418,7 +449,10 @@ namespace NSB
       generate_start_plan(void)
       {
         GeometricPath::PathReference path_ref;
-        m_path.getPathReference(0., path_ref);
+        if (m_params.use_ellipse)
+          m_ellipse_path.getPathReference(0., path_ref);
+        else
+          m_waypoint_path.getPathReference(0., path_ref);
         double c_psi = std::cos(path_ref.psi);
         double s_psi = std::sin(path_ref.psi);
 

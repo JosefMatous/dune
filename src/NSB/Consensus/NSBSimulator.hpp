@@ -42,7 +42,7 @@ namespace NSB
     } 
 
     inline void
-    nsb_simulator_step(EstimatorParameters& params, ObstacleState& obs, StateEstimate& nsb_state)
+    nsb_simulator_step(EstimatorParameters& params, std::map<uint16_t, ObstacleState>& obs, StateEstimate& nsb_state)
     {
       GeometricPath::PathReference ref;
       params.path->getPathReference(nsb_state.path_param, ref);
@@ -83,13 +83,13 @@ namespace NSB
       }      
     }
 
-    inline void
+    void
     nsb_simulator_run(EstimatorParameters& params, ObstacleEstimator& obs_est, StateEstimate& nsb_state, double t_start, double t_end, double delta_t_max)
     {
       int N_steps;
       get_step_size(t_start, t_end, delta_t_max, params.delta_t, N_steps);
       double time = t_start;
-      ObstacleState obs;
+      std::map<uint16_t, ObstacleState> obs;
       for (int i = 0; i < N_steps; i++)
       {
         obs_est.get_obstacle_state(time, obs);

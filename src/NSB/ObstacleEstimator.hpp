@@ -42,7 +42,7 @@ namespace NSB
     class ObstacleEstimator
     {
       public:
-        ObstacleState m_obstacle_state;
+        std::map<uint16_t, ObstacleState> m_obstacle_states;
 
         ObstacleEstimator()
         {        
@@ -52,33 +52,44 @@ namespace NSB
         inline void
         simulate(double timestamp)
         {
-          double delta_t = timestamp - m_obstacle_state.timestamp;
-          m_obstacle_state.timestamp = timestamp;
-          m_obstacle_state.x += m_obstacle_state.vx * delta_t;
-          m_obstacle_state.y += m_obstacle_state.vy * delta_t;
+          for (auto pair: m_obstacle_states)
+          {
+            double delta_t = timestamp - pair.second.timestamp;
+            pair.second.timestamp = timestamp;
+            pair.second.x += pair.second.vx * delta_t;
+            pair.second.y += pair.second.vy * delta_t;
+          }
         }
 
         //! Updates the obstacle state (including the timestamp)
         inline void
         update(const IMC::Target* msg, double lat0, double lon0)
         {
-          m_obstacle_state.timestamp = msg->getTimeStamp();
-          m_obstacle_state.vx = msg->sog * std::cos(msg->cog);
-          m_obstacle_state.vy = msg->sog * std::sin(msg->cog);   
-          WGS84::displacement(lat0, lon0, 0., msg->lat, msg->lon, 0., &m_obstacle_state.x, &m_obstacle_state.y);       
+          uint16_t obstacle_id;
+          if (castLexical(msg->label, obstacle_id))
+          {
+            m_obstacle_states[obstacle_id].timestamp = msg->getTimeStamp();
+            m_obstacle_states[obstacle_id].vx = msg->sog * std::cos(msg->cog);
+            m_obstacle_states[obstacle_id].vy = msg->sog * std::sin(msg->cog);   
+            WGS84::displacement(lat0, lon0, 0., msg->lat, msg->lon, 0., &m_obstacle_states[obstacle_id].x, &m_obstacle_states[obstacle_id].y);       
+          }
         }
 
         //! Get obstacle state at a given timestamp
         inline void
-        get_obstacle_state(double timestamp, ObstacleState& output)
+        get_obstacle_state(double timestamp, std::map<uint16_t, ObstacleState>& output)
         {
-          output.timestamp = timestamp;
-          output.vx = m_obstacle_state.vx;
-          output.vy = m_obstacle_state.vy;
-          
-          double delta_t = timestamp - m_obstacle_state.timestamp;
-          output.x = m_obstacle_state.x + delta_t*m_obstacle_state.vx;
-          output.y = m_obstacle_state.y + delta_t*m_obstacle_state.vy;
+          for (auto pair: m_obstacle_states)
+          {
+            uint16_t id = pair.first;
+            output[id].timestamp = pair.second.timestamp;
+            output[id].vx = pair.second.vx;
+            output[id].vy = pair.second.vy;
+            
+            double delta_t = timestamp - pair.second.timestamp;
+            output[id].x = pair.second.x + delta_t*pair.second.vx;
+            output[id].y = pair.second.y + delta_t*pair.second.vy;
+          }
         }
     };    
 }

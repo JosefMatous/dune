@@ -51,17 +51,34 @@ namespace NSB
         double lat0;
         //! Initial longitude.
         double lon0;
+        //! Initial x-offset
+        std::vector<float> x0;
+        //! Initial y-offset
+        std::vector<float> y0;
         //! Velocity x.
-        float v_x;
+        std::vector<float> v_x;
         //! Velocity y.
-        float v_y;
+        std::vector<float> v_y;
+        //! Broadcast obstacles to Neptus via IMC::EstimatedState message
+        bool broadcast_estate;
+        //! List of system names for the obstacles
+        std::vector<std::string> system_names;
+        //! System names converted to system IDs
+        std::vector<uint16_t> system_ids;
       } m_params;
 
       IMC::Target m_message;
+      IMC::EstimatedState m_estate;
       IMC::NSBParametersRequest m_nsb_request;
 
       bool m_active;
-      float m_x, m_y;
+      bool m_is_initialized;
+
+      //! Current x-offset
+      std::vector<float> m_x;
+      //! Current y-offset
+      std::vector<float> m_y;
+
       Delta m_delta;
 
       //! Constructor.
@@ -73,20 +90,28 @@ namespace NSB
         bind<IMC::ExperimentControl>(this);
         bind<IMC::NSBParameters>(this);
 
-        param("Initial Latitude", m_params.lat0)
-          .defaultValue("0.7188139"); 
-        param("Initial Longitude", m_params.lon0)
-          .defaultValue("-0.1519519");
-        param("Velocity -- x", m_params.v_x)
-          .defaultValue("0");
-        param("Velocity -- y", m_params.v_y)
-          .defaultValue("0");
         param("Active", m_active)
           .defaultValue("false");
+        param("Broadcast as EstimatedState", m_params.broadcast_estate)
+          .defaultValue("false");
+        param("System Names", m_params.system_names)
+          .defaultValue("");
 
-        m_message.label = "obstacle";
-        
-        reset();
+        m_is_initialized = false;
+        m_delta.reset();
+
+        m_estate.depth = 0.;
+        m_estate.height = 0.;
+        m_estate.z = 0.;
+        m_estate.alt = 0.;
+        m_estate.theta = 0.;
+        m_estate.phi = 0.;
+        m_estate.p = 0.;
+        m_estate.q = 0.;
+        m_estate.r = 0.;
+        m_estate.v = 0.;
+        m_estate.w = 0.;
+        m_estate.vz = 0.;
       }
 
       void
@@ -94,6 +119,13 @@ namespace NSB
       {
         if (paramChanged(m_active))
           reset();
+
+        if (paramChanged(m_params.system_names))
+        {
+          m_params.system_ids.resize(m_params.system_names.size());
+          for (size_t i = 0; i < m_params.system_names.size(); i++)
+            m_params.system_ids[i] = m_ctx.resolver.resolve(m_params.system_names[i]);          
+        }
       }
 
       void
@@ -106,8 +138,15 @@ namespace NSB
       inline void
       reset(void)
       {
-        m_x = 0.;
-        m_y = 0.;
+        if (m_is_initialized)
+        {
+          for (size_t i = 0; i < m_x.size(); i++)
+          {
+            m_x[i] = m_params.x0[i];
+            m_y[i] = m_params.y0[i]; 
+          }
+        }
+        
         m_delta.reset();
         debug("Obstacle reset");
       }
@@ -117,8 +156,42 @@ namespace NSB
       {
         m_params.lat0 = msg->obs_lat;
         m_params.lon0 = msg->obs_lon;
-        m_params.v_x = msg->obs_vx;
-        m_params.v_y = msg->obs_vy;
+
+        m_estate.lat = msg->obs_lat;
+        m_estate.lon = msg->obs_lon;
+
+        if (!castLexical(msg->obs_x, m_params.x0))
+        {
+          err("Could not resolve the x-position of the obstacles");
+          return;
+        }
+        if (!castLexical(msg->obs_y, m_params.y0))
+        {
+          err("Could not resolve the y-position of the obstacles");
+          return;
+        }
+        if (!castLexical(msg->obs_vx, m_params.v_x))
+        {
+          err("Could not resolve the x-velocity of the obstacles");
+          return;
+        }
+        if (!castLexical(msg->obs_vy, m_params.v_y))
+        {
+          err("Could not resolve the y-velocity of the obstacles");
+          return;
+        }
+        size_t N = m_params.x0.size();
+        if ((m_params.y0.size() != N) || (m_params.v_x.size() != N) || (m_params.v_y.size() != N))
+        {
+          err("Vector sizes do not match.");
+          return;
+        }
+
+        m_x.resize(N);
+        m_y.resize(N);
+
+        m_is_initialized = true;
+        reset();
       }
 
       void
@@ -142,17 +215,39 @@ namespace NSB
         if (m_active)
         {
           double delta_t = m_delta.getDelta();
-          
-          m_x += m_params.v_x * delta_t;
-          m_y += m_params.v_y * delta_t;
 
-          m_message.lat = m_params.lat0;
-          m_message.lon = m_params.lon0;
-          WGS84::displace(m_x, m_y, &m_message.lat, &m_message.lon);
-          m_message.sog = std::sqrt(square(m_params.v_x) + square(m_params.v_y));
-          m_message.cog = std::atan2(m_params.v_y, m_params.v_x);
-          debug("Obstacle at (%f, %f)", m_x, m_y);
-          dispatch(m_message);
+          for (size_t i = 0; i < m_x.size(); i++)
+          {
+            m_x[i] += m_params.v_x[i] * delta_t;
+            m_y[i] += m_params.v_y[i] * delta_t;
+
+            // Set obstacle label
+            std::ostringstream formatter(std::ostringstream::ate);
+            formatter << i;
+            m_message.label = formatter.str();
+            // Displace obstacle latitude
+            m_message.lat = m_params.lat0;
+            m_message.lon = m_params.lon0;
+            WGS84::displace(m_x[i], m_y[i], &m_message.lat, &m_message.lon);
+            // Calculate speed and course
+            m_message.sog = std::sqrt(square(m_params.v_x[i]) + square(m_params.v_y[i]));
+            m_message.cog = std::atan2(m_params.v_y[i], m_params.v_x[i]);
+            debug("Obstacle at (%g, %g)", m_x[i], m_y[i]);
+            dispatch(m_message);
+
+            if (m_params.broadcast_estate && (m_params.system_ids.size() >= m_x.size()))
+            {
+              m_estate.x = m_x[i];
+              m_estate.y = m_y[i];
+              m_estate.vx = m_params.v_x[i];
+              m_estate.vy = m_params.v_y[i];
+              m_estate.u = m_message.sog;
+              m_estate.psi = m_message.cog;
+              m_estate.setSource(m_params.system_ids[i]);
+              debug("Obstacle source set to %u", m_params.system_ids[i]);
+              dispatch(m_estate, DF_KEEP_SRC_EID);
+            }
+          }
         }
       }
     };    

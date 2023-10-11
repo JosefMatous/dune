@@ -53,7 +53,8 @@ namespace NSB
 
     struct Task: public DUNE::Tasks::Task
     {
-      Ellipse m_path;
+      Ellipse m_ellipse_path;
+      Waypoints m_waypoint_path;
       LineOfSight m_los;
       ObstacleAvoidance m_obs_avoid;
       ObstacleEstimator m_obs_est;
@@ -90,12 +91,15 @@ namespace NSB
 
       bool is_initialized, m_active, m_has_obstacle, has_estate;
 
+      bool m_use_waypoints;
+      size_t m_last_waypoint;
+
       //! Constructor.
       //! @param[in] name task name.
       //! @param[in] ctx context.
       Task(const std::string& name, Tasks::Context& ctx):
         DUNE::Tasks::Task(name, ctx),
-        m_path(0, 0, 0., 50., 30., 0., 0., 0., false, M_PI_2, 0.),
+        m_ellipse_path(0, 0, 0., 50., 30., 0., 0., 0., false, M_PI_2, 0.),
         m_los(15., false, 1.3, 0.5),
         m_msg_buffer(8),
         m_msg_processed(8)
@@ -109,7 +113,7 @@ namespace NSB
         bind<IMC::ClockOffset>(this);
 
         m_params.los = &m_los;
-        m_params.path = &m_path;
+        m_params.path = &m_ellipse_path;
         m_params.oa = &m_obs_avoid;
 
         param("Initial Covariance", m_params.P0)
@@ -167,12 +171,12 @@ namespace NSB
       inline void
       debugExternalParameters(void)
       {
-        debug("Ellipse -- Origin [%.2f, %.2f, %.2f]", m_path.m_x_center, m_path.m_y_center, m_path.m_z_center);
-        debug("Ellipse -- Axes   [%.2f, %.2f, %.2f]", m_path.m_a, m_path.m_b, m_path.m_c);
-        debug("Ellipse -- Clockwise %u", m_path.m_clockwise);
-        debug("Ellipse -- Orientation %.3f", m_path.m_psi);
-        debug("Ellipse -- Frequency %.1f", m_path.m_z_freq);
-        debug("Ellipse -- Initial Phases [%.3f, %.3f]", m_path.m_phi0, m_path.m_z_phi0);
+        debug("Ellipse -- Origin [%.2f, %.2f, %.2f]", m_ellipse_path.m_x_center, m_ellipse_path.m_y_center, m_ellipse_path.m_z_center);
+        debug("Ellipse -- Axes   [%.2f, %.2f, %.2f]", m_ellipse_path.m_a, m_ellipse_path.m_b, m_ellipse_path.m_c);
+        debug("Ellipse -- Clockwise %u", m_ellipse_path.m_clockwise);
+        debug("Ellipse -- Orientation %.3f", m_ellipse_path.m_psi);
+        debug("Ellipse -- Frequency %.1f", m_ellipse_path.m_z_freq);
+        debug("Ellipse -- Initial Phases [%.3f, %.3f]", m_ellipse_path.m_phi0, m_ellipse_path.m_z_phi0);
 
         debug("LOS -- Lookahead Distance %f", m_los.m_lookahead);
         debug("LOS -- Speed %f", m_los.m_speed);
@@ -199,6 +203,8 @@ namespace NSB
         m_next_period = m_params.T_min;
         m_next_transmission_uw = 0.;
         m_next_period_uw = m_params.T_min_uw;
+
+        m_last_waypoint = 0;
 
         m_msg_buffer.clear();
         m_msg_processed.clear();
@@ -251,7 +257,10 @@ namespace NSB
       consume(const IMC::NSBParameters* msg)
       {
         if (has_estate)
-          updatePathParameters(msg, m_path, m_lat0, m_lon0);
+        {
+          updateEllipsePathParameters(msg, m_ellipse_path, m_lat0, m_lon0);
+          updateWaypointPathParameters(msg, m_waypoint_path, m_lat0, m_lon0);
+        }
         updateLosParameters(msg, m_los);
         updateFormationShape(msg, m_params.p_form);
         updateObstacleAvoidance(msg, m_obs_avoid);
@@ -281,11 +290,20 @@ namespace NSB
       {
         if (msg->delay <= 0.)
         {
-          bool new_active = (msg->op == ExperimentControl::OP_START && msg->experiment == ExperimentControl::EX_NSB);
-          if (new_active != m_active)
+          if (msg->experiment == ExperimentControl::EX_NSB_ELLIPSE || msg->experiment == ExperimentControl::EX_NSB_WP)
           {
-            m_active = new_active;
-            reset();
+            bool new_active = (msg->op == ExperimentControl::OP_START);
+            m_use_waypoints = (msg->experiment == ExperimentControl::EX_NSB_WP);
+            if (m_use_waypoints)
+              m_params.path = &m_waypoint_path;
+            else
+              m_params.path = &m_ellipse_path;
+
+            if (new_active != m_active)
+            {
+              m_active = new_active;
+              reset();
+            }
           }
         }
       }
@@ -293,6 +311,9 @@ namespace NSB
       void
       consume(const IMC::EstimatedState* msg)
       {
+        if (msg->getSource() != getSystemId())
+          return;
+
         m_lat0 = msg->lat;
         m_lon0 = msg->lon;
         m_z = msg->depth;
@@ -311,7 +332,7 @@ namespace NSB
             if (m_has_obstacle)
             {
               m_obs_est.simulate(m_current_timestamp);
-              nsb_simulator_step(m_params, m_obs_est.m_obstacle_state, m_nsb_state);
+              nsb_simulator_step(m_params, m_obs_est.m_obstacle_states, m_nsb_state);
             }
             else
             {
@@ -336,6 +357,22 @@ namespace NSB
           {
             self_update(m_nsb_state, m_params, msg, m_p_hat);
             reset_position_estimate(msg);
+          }
+
+          // When using the waypoint path, reset if we reach a new waypoint
+          if (m_use_waypoints)
+          {
+            size_t current_waypoint = m_waypoint_path.findWaypointIndex(m_nsb_state.path_param);
+            if (current_waypoint != m_last_waypoint)
+            {
+              debug("Reached a new waypoint; resetting ...");
+              m_next_transmission = 0.;
+              m_next_period = m_params.T_min;
+              m_next_transmission_uw = 0.;
+              m_next_period_uw = m_params.T_min_uw;
+
+              m_last_waypoint = current_waypoint;
+            }
           }
 
           // Process the NSB messages here if there is artificial delay

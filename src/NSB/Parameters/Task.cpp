@@ -42,64 +42,9 @@ namespace NSB
 
     struct Task: public DUNE::Tasks::Task
     {
-      IMC::NSBParameters m_msg;
+      IMC::NSBParameters m_params;
 
-      struct {
-        //! Path Latitude.
-        fp64_t path_lat;
-        //! Path Longitude.
-        fp64_t path_lon;
-        //! Path Depth.
-        fp64_t path_z;
-        //! Path Semimajor Axis.
-        fp64_t path_a;
-        //! Path Semiminor Axis.
-        fp64_t path_b;
-        //! Path Z Amplitude.
-        fp64_t path_c;
-        //! Path Clockwise.
-        bool path_clockwise;
-        //! Path Orientation.
-        fp64_t path_psi;
-        //! Path Z Frequency.
-        fp64_t path_z_freq;
-        //! Path Initial Phase.
-        fp64_t path_phi0;
-        //! Path Z Initial Phase.
-        fp64_t path_z_phi0;
-        //! LOS Lookahead Distance.
-        fp64_t los_lookahead;
-        //! LOS Speed.
-        fp64_t los_speed;
-        //! LOS Update Gain.
-        fp64_t los_gain;
-        //! LOS Adaptive.
-        bool los_adaptive;
-        //! Formation x.
-        fp64_t form_x;
-        //! Formation y.
-        fp64_t form_y;
-        //! Formation z.
-        fp64_t form_z;
-        //! Formation Maximum Speed.
-        fp64_t form_max_speed;
-        //! Formation Keeping Gain.
-        fp64_t form_gain;
-        //! Obstacle Avoidance Radius.
-        fp64_t oa_radius;
-        //! Collision Cone Angle.
-        fp64_t oa_cone;
-        //! Obstacle Avoidance Hysteresis.
-        fp64_t oa_hysteresis;
-        //! Obstacle Latitude.
-        fp64_t obs_lat;
-        //! Obstacle Longitude.
-        fp64_t obs_lon;
-        //! Obstacle Velocity x.
-        fp64_t obs_vx;
-        //! Obstacle Velocity y.
-        fp64_t obs_vy;
-      } m_params;
+      bool m_ellipse_path_clockwise, m_los_adaptive;
 
       //! Constructor.
       //! @param[in] name task name.
@@ -109,51 +54,66 @@ namespace NSB
       {
         bind<IMC::NSBParametersRequest>(this);
 
-        param("Ellipse -- Origin Latitude", m_params.path_lat)
+        param("Ellipse -- Origin Latitude", m_params.ellipse_path_lat)
           .defaultValue("0.71881387");
-        param("Ellipse -- Origin Longitude", m_params.path_lon)
+        param("Ellipse -- Origin Longitude", m_params.ellipse_path_lon)
           .defaultValue("-0.15195186");
-        param("Ellipse -- Depth", m_params.path_z)
+        param("Ellipse -- Depth", m_params.ellipse_path_z)
           .defaultValue("0.")
           .description("Depth of the center of the ellipse");
-        param("Ellipse -- Semimajor Axis", m_params.path_a)
+        param("Ellipse -- Semimajor Axis", m_params.ellipse_path_a)
           .defaultValue("60.")
           .minimumValue("10.")
           .maximumValue("1000.")
           .description("Semimajor axis of the ellipse");
-        param("Ellipse -- Semiminor Axis", m_params.path_b)
+        param("Ellipse -- Semiminor Axis", m_params.ellipse_path_b)
           .defaultValue("40.")
           .minimumValue("10.")
           .maximumValue("1000.")
           .description("Semiminor axis of the ellipse");
-        param("Ellipse -- Z Amplitude", m_params.path_c)
+        param("Ellipse -- Z Amplitude", m_params.ellipse_path_c)
           .defaultValue("0.")
           .minimumValue("0.")
           .maximumValue("100.")
           .description("Amplitude of oscillations in the z-axis");
-        param("Ellipse -- Clockwise", m_params.path_clockwise)
+        param("Ellipse -- Clockwise", m_ellipse_path_clockwise)
           .defaultValue("true")
           .description("True if the path goes clockwise; false if anticlockwise");
-        param("Ellipse -- Orientation", m_params.path_psi)
+        param("Ellipse -- Orientation", m_params.ellipse_path_psi)
           .defaultValue("0")
           .description("Orientation (yaw angle) of the ellipse. Zero means semimajor axis facing north");
-        param("Ellipse -- Z Frequency", m_params.path_z_freq)
+        param("Ellipse -- Z Frequency", m_params.ellipse_path_z_freq)
           .defaultValue("0.")
           .description("Frequency of oscillations in the z-axis");
-        param("Ellipse -- Initial Phase", m_params.path_phi0)
+        param("Ellipse -- Initial Phase", m_params.ellipse_path_phi0)
           .defaultValue("0.")
           .description("Initial phase of the ellipse");
-        param("Ellipse -- Z Initial Phase", m_params.path_z_phi0)
+        param("Ellipse -- Z Initial Phase", m_params.ellipse_path_z_phi0)
           .defaultValue("0.")
           .description("Initial phase of oscillations in the z-axis");
+
+        param("Waypoints -- Origin Latitude", m_params.waypoint_path_lat)
+          .defaultValue("0.71881387");
+        param("Waypoints -- Origin Longitude", m_params.waypoint_path_lon)
+          .defaultValue("-0.15195186");
+        param("Waypoints -- x-offset", m_params.waypoint_path_x)
+          .defaultValue("50,50,-50,-50,50");
+        param("Waypoints -- y-offset", m_params.waypoint_path_y)
+          .defaultValue("-30,30,30,-30,-30");
+        param("Waypoints -- Depth", m_params.waypoint_path_z)
+          .defaultValue("0,0,0,0,0");
+        param("Waypoints -- Dubins Radius", m_params.waypoint_radius)
+          .defaultValue("35")
+          .minimumValue("10")
+          .maximumValue("100");
 
         param("LOS -- Lookahead Distance", m_params.los_lookahead)
           .defaultValue("15.")
           .minimumValue("1.")
           .maximumValue("100.")
           .description("Lookahead distance of the LOS algorithm");
-        param("LOS -- Adaptive", m_params.los_adaptive)
-          .defaultValue("true")
+        param("LOS -- Adaptive", m_los_adaptive)
+          .defaultValue("false")
           .description("True if using adaptive lookahead distance");
         param("LOS -- Speed", m_params.los_speed)
           .defaultValue("1.3")
@@ -189,7 +149,7 @@ namespace NSB
           .minimumValue("1")
           .maximumValue("30");
         param("Obstacle Avoidance -- Radius", m_params.oa_radius)
-          .defaultValue("5")
+          .defaultValue("15")
           .minimumValue("1")
           .maximumValue("30");
         param("Obstacle Avoidance -- Hysteresis", m_params.oa_hysteresis)
@@ -197,10 +157,14 @@ namespace NSB
           .minimumValue("0")
           .maximumValue("10");
 
-        param("Obstacle -- Initial Latitude", m_params.obs_lat)
+        param("Obstacle -- Origin Latitude", m_params.obs_lat)
           .defaultValue("0.7188139"); 
-        param("Obstacle -- Initial Longitude", m_params.obs_lon)
+        param("Obstacle -- Origin Longitude", m_params.obs_lon)
           .defaultValue("-0.1519519");
+        param("Obstacle -- Offset x", m_params.obs_x)
+          .defaultValue("0");
+        param("Obstacle -- Offset y", m_params.obs_y)
+          .defaultValue("0");
         param("Obstacle -- Velocity x", m_params.obs_vx)
           .defaultValue("0");
         param("Obstacle -- Velocity y", m_params.obs_vy)
@@ -210,40 +174,19 @@ namespace NSB
       inline void
       convertParamsToMessage(void)
       {
-        m_msg.path_lat = m_params.path_lat;        
-        m_msg.path_lon = m_params.path_lon;        
-        m_msg.path_z = m_params.path_z;        
-        m_msg.path_a = m_params.path_a;        
-        m_msg.path_b = m_params.path_b;        
-        m_msg.path_c = m_params.path_c;        
-        m_msg.path_clockwise = m_params.path_clockwise ? IMC::BOOL_TRUE : IMC::BOOL_FALSE;        
-        m_msg.path_psi = m_params.path_psi;        
-        m_msg.path_z_freq = m_params.path_z_freq;        
-        m_msg.path_phi0 = m_params.path_phi0;        
-        m_msg.path_z_phi0 = m_params.path_z_phi0;        
-        m_msg.los_lookahead = m_params.los_lookahead;        
-        m_msg.los_speed = m_params.los_speed;        
-        m_msg.los_gain = m_params.los_gain;        
-        m_msg.los_adaptive = m_params.los_adaptive ? IMC::BOOL_TRUE : IMC::BOOL_FALSE;;        
-        m_msg.form_x = m_params.form_x;        
-        m_msg.form_y = m_params.form_y;        
-        m_msg.form_z = m_params.form_z;        
-        m_msg.form_max_speed = m_params.form_max_speed;        
-        m_msg.form_gain = m_params.form_gain;        
-        m_msg.oa_radius = m_params.oa_radius;        
-        m_msg.oa_cone = Angles::radians(m_params.oa_cone);        
-        m_msg.oa_hysteresis = Angles::radians(m_params.oa_hysteresis);        
-        m_msg.obs_lat = m_params.obs_lat;        
-        m_msg.obs_lon = m_params.obs_lon;        
-        m_msg.obs_vx = m_params.obs_vx;        
-        m_msg.obs_vy = m_params.obs_vy;
+        m_params.ellipse_path_clockwise = m_ellipse_path_clockwise ? IMC::BOOL_TRUE : IMC::BOOL_FALSE;
+        m_params.los_adaptive = m_los_adaptive ? IMC::BOOL_TRUE : IMC::BOOL_FALSE;
       }
 
       void
       onUpdateParameters(void)
       {
+        if (paramChanged(m_params.oa_cone))
+          m_params.oa_cone = Angles::radians(m_params.oa_cone);
+        if (paramChanged(m_params.oa_hysteresis))
+          m_params.oa_hysteresis = Angles::radians(m_params.oa_hysteresis);
         convertParamsToMessage();
-        dispatch(m_msg);
+        dispatch(m_params);
       }
 
       void
@@ -251,7 +194,7 @@ namespace NSB
       {
         debug("Entity %u requested NSB parameters", msg->getSourceEntity());
         convertParamsToMessage();
-        dispatch(m_msg);
+        dispatch(m_params);
       }
 
       //! Main loop.

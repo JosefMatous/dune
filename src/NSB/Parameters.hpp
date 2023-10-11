@@ -44,20 +44,40 @@ namespace NSB
     using DUNE_NAMESPACES;
 
     inline void
-    updatePathParameters(const IMC::NSBParameters* param, Ellipse& path, double lat0, double lon0)
+    updateEllipsePathParameters(const IMC::NSBParameters* param, Ellipse& path, double lat0, double lon0)
     {
-      WGS84::displacement(lat0, lon0, 0., param->path_lat, param->path_lon, 0., &(path.m_x_center), &(path.m_y_center)); 
-      path.m_z_center = param->path_z;
+      WGS84::displacement(lat0, lon0, 0., param->ellipse_path_lat, param->ellipse_path_lon, 0., &(path.m_x_center), &(path.m_y_center)); 
+      path.m_z_center = param->ellipse_path_z;
 
-      path.m_a = param->path_a;
-      path.m_b = param->path_b;
-      path.m_c = param->path_c;
+      path.m_a = param->ellipse_path_a;
+      path.m_b = param->ellipse_path_b;
+      path.m_c = param->ellipse_path_c;
 
-      path.m_clockwise = param->path_clockwise;
-      path.m_psi = param->path_psi;
-      path.m_z_freq = param->path_z_freq;
-      path.m_phi0 = param->path_phi0;
-      path.m_z_phi0 = param->path_z_phi0;
+      path.m_clockwise = param->ellipse_path_clockwise;
+      path.m_psi = param->ellipse_path_psi;
+      path.m_z_freq = param->ellipse_path_z_freq;
+      path.m_phi0 = param->ellipse_path_phi0;
+      path.m_z_phi0 = param->ellipse_path_z_phi0;
+    }
+
+    inline void
+    updateWaypointPathParameters(const IMC::NSBParameters* param, Waypoints& path, double lat0, double lon0)
+    {
+      double x0, y0;
+      WGS84::displacement(lat0, lon0, 0., param->waypoint_path_lat, param->waypoint_path_lon, 0., &x0, &y0);
+
+      std::vector<double> wp_x, wp_y, wp_z;
+      castLexical(param->waypoint_path_x, wp_x);
+      castLexical(param->waypoint_path_y, wp_y);
+      castLexical(param->waypoint_path_z, wp_z);
+      for (size_t i = 0; i < wp_x.size(); i++)
+      {
+        wp_x[i] += x0;
+        wp_y[i] += y0;
+      }
+      
+      path.setWaypoints(wp_x, wp_y, wp_z);
+      path.setDubinsRadius(param->waypoint_radius);
     }
 
     inline void

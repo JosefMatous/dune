@@ -85,7 +85,7 @@ namespace NSB
 
         m_T_start = -1.;
         m_stop_experiment.op = ExperimentControl::OP_STOP;
-        m_stop_experiment.experiment = ExperimentControl::EX_NSB;
+        m_stop_experiment.experiment = ExperimentControl::EX_PATH_FOLLOWING;
         m_stop_experiment.obstacle = IMC::BOOL_TRUE;
         m_stop_experiment.delay = 0.;
 
@@ -174,7 +174,7 @@ namespace NSB
       consume(const IMC::NSBParameters* msg)
       {
         if (is_initialized)
-          updatePathParameters(msg, m_path, m_lat0, m_lon0);
+          updateEllipsePathParameters(msg, m_path, m_lat0, m_lon0);
         updateLosParameters(msg, m_los);
         updateObstacleAvoidance(msg, m_obs_avoid);
       }
@@ -190,6 +190,9 @@ namespace NSB
       void
       consume(const IMC::EstimatedState* msg)
       {
+        if (msg->getSource() != getSystemId())
+          return;
+
         m_lat0 = msg->lat;
         m_lon0 = msg->lon;
         if (!is_initialized)
@@ -220,7 +223,7 @@ namespace NSB
           if (m_has_obstacle)
           {
             m_obs_est.simulate(Clock::getSinceEpoch());
-            m_obs_avoid.step(msg->x, msg->y, m_obs_est.m_obstacle_state, 0., out);
+            m_obs_avoid.step(msg->x, msg->y, m_obs_est.m_obstacle_states, 0., out);
             //debug("LOS vector after OA: x = %.2f, y = %.2f, z = %.2f", out.velocity.x, out.velocity.y, out.velocity.z);
           }
 

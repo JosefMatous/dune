@@ -172,6 +172,9 @@ namespace NSB
       void
       consume(const IMC::EstimatedState* msg)
       {
+        if (msg->getSource() != getSystemId())
+          return;
+          
         uint16_t current_decimation = (m_transmission_counter < m_params.N_measurements) ? m_params.init_decimation : m_params.final_decimation;
         if ((++m_decimation_counter % current_decimation) > 0)
           return;

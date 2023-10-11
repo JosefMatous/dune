@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: db38089ebb053077c1fe78eda6b1439b                            *
+// IMC XML MD5: 29f572aeb47905e5a14c6967638f6a58                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_DEFINITIONS_HPP_INCLUDED_
@@ -26723,8 +26723,10 @@ namespace DUNE
       {
         //! Curved Path Following.
         EX_PATH_FOLLOWING = 0,
-        //! Distributed NSB.
-        EX_NSB = 1
+        //! Distributed NSB, Ellipse Path.
+        EX_NSB_ELLIPSE = 1,
+        //! Distributed NSB, Waypoints.
+        EX_NSB_WP = 2
       };
 
       //! Operation.
@@ -26794,28 +26796,40 @@ namespace DUNE
     class NSBParameters: public Message
     {
     public:
-      //! Path Latitude.
-      fp64_t path_lat;
-      //! Path Longitude.
-      fp64_t path_lon;
-      //! Path Depth.
-      fp64_t path_z;
-      //! Path Semimajor Axis.
-      fp64_t path_a;
-      //! Path Semiminor Axis.
-      fp64_t path_b;
-      //! Path Z Amplitude.
-      fp64_t path_c;
-      //! Path Clockwise.
-      uint8_t path_clockwise;
-      //! Path Orientation.
-      fp64_t path_psi;
-      //! Path Z Frequency.
-      fp64_t path_z_freq;
-      //! Path Initial Phase.
-      fp64_t path_phi0;
-      //! Path Z Initial Phase.
-      fp64_t path_z_phi0;
+      //! Ellipse Path Origin Latitude.
+      fp64_t ellipse_path_lat;
+      //! Ellipse Path Origin Longitude.
+      fp64_t ellipse_path_lon;
+      //! Ellipse Path Depth.
+      fp64_t ellipse_path_z;
+      //! Ellipse Path Semimajor Axis.
+      fp64_t ellipse_path_a;
+      //! Ellipse Path Semiminor Axis.
+      fp64_t ellipse_path_b;
+      //! Ellipse Path Z Amplitude.
+      fp64_t ellipse_path_c;
+      //! Ellipse Path Clockwise.
+      uint8_t ellipse_path_clockwise;
+      //! Ellipse Path Orientation.
+      fp64_t ellipse_path_psi;
+      //! Ellipse Path Z Frequency.
+      fp64_t ellipse_path_z_freq;
+      //! Ellipse Path Initial Phase.
+      fp64_t ellipse_path_phi0;
+      //! Ellipse Path Z Initial Phase.
+      fp64_t ellipse_path_z_phi0;
+      //! Waypoint Path Origin Latitude.
+      fp64_t waypoint_path_lat;
+      //! Waypoint Path Origin Longitude.
+      fp64_t waypoint_path_lon;
+      //! Waypoint Path Offset x.
+      std::string waypoint_path_x;
+      //! Waypoint Path Offset y.
+      std::string waypoint_path_y;
+      //! Waypoint Path Depth.
+      std::string waypoint_path_z;
+      //! Waypoint Dubins Radius.
+      fp64_t waypoint_radius;
       //! LOS Lookahead Distance.
       fp64_t los_lookahead;
       //! LOS Speed.
@@ -26840,14 +26854,18 @@ namespace DUNE
       fp64_t oa_cone;
       //! Obstacle Avoidance Hysteresis.
       fp64_t oa_hysteresis;
-      //! Obstacle Latitude.
+      //! Obstacle Initial Latitude.
       fp64_t obs_lat;
-      //! Obstacle Longitude.
+      //! Obstacle Initial Longitude.
       fp64_t obs_lon;
-      //! Obstacle Velocity x.
-      fp64_t obs_vx;
-      //! Obstacle Velocity y.
-      fp64_t obs_vy;
+      //! Obstacles Offset x.
+      std::string obs_x;
+      //! Obstacles Offset y.
+      std::string obs_y;
+      //! Obstacles Velocity x.
+      std::string obs_vx;
+      //! Obstacles Velocity y.
+      std::string obs_vy;
 
       static uint16_t
       getIdStatic(void)
@@ -26896,7 +26914,13 @@ namespace DUNE
       unsigned
       getFixedSerializationSize(void) const
       {
-        return 202;
+        return 210;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return IMC::getSerializationSize(waypoint_path_x) + IMC::getSerializationSize(waypoint_path_y) + IMC::getSerializationSize(waypoint_path_z) + IMC::getSerializationSize(obs_x) + IMC::getSerializationSize(obs_y) + IMC::getSerializationSize(obs_vx) + IMC::getSerializationSize(obs_vy);
       }
 
       void

@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: db38089ebb053077c1fe78eda6b1439b                            *
+// IMC XML MD5: 29f572aeb47905e5a14c6967638f6a58                            *
 //***************************************************************************
 
 // ISO C++ 98 headers.
@@ -28323,17 +28323,23 @@ namespace DUNE
     void
     NSBParameters::clear(void)
     {
-      path_lat = 0;
-      path_lon = 0;
-      path_z = 0;
-      path_a = 0;
-      path_b = 0;
-      path_c = 0;
-      path_clockwise = 0;
-      path_psi = 0;
-      path_z_freq = 0;
-      path_phi0 = 0;
-      path_z_phi0 = 0;
+      ellipse_path_lat = 0;
+      ellipse_path_lon = 0;
+      ellipse_path_z = 0;
+      ellipse_path_a = 0;
+      ellipse_path_b = 0;
+      ellipse_path_c = 0;
+      ellipse_path_clockwise = 0;
+      ellipse_path_psi = 0;
+      ellipse_path_z_freq = 0;
+      ellipse_path_phi0 = 0;
+      ellipse_path_z_phi0 = 0;
+      waypoint_path_lat = 0;
+      waypoint_path_lon = 0;
+      waypoint_path_x.clear();
+      waypoint_path_y.clear();
+      waypoint_path_z.clear();
+      waypoint_radius = 0;
       los_lookahead = 0;
       los_speed = 0;
       los_gain = 0;
@@ -28348,25 +28354,33 @@ namespace DUNE
       oa_hysteresis = 0;
       obs_lat = 0;
       obs_lon = 0;
-      obs_vx = 0;
-      obs_vy = 0;
+      obs_x.clear();
+      obs_y.clear();
+      obs_vx.clear();
+      obs_vy.clear();
     }
 
     bool
     NSBParameters::fieldsEqual(const Message& msg__) const
     {
       const IMC::NSBParameters& other__ = static_cast<const NSBParameters&>(msg__);
-      if (path_lat != other__.path_lat) return false;
-      if (path_lon != other__.path_lon) return false;
-      if (path_z != other__.path_z) return false;
-      if (path_a != other__.path_a) return false;
-      if (path_b != other__.path_b) return false;
-      if (path_c != other__.path_c) return false;
-      if (path_clockwise != other__.path_clockwise) return false;
-      if (path_psi != other__.path_psi) return false;
-      if (path_z_freq != other__.path_z_freq) return false;
-      if (path_phi0 != other__.path_phi0) return false;
-      if (path_z_phi0 != other__.path_z_phi0) return false;
+      if (ellipse_path_lat != other__.ellipse_path_lat) return false;
+      if (ellipse_path_lon != other__.ellipse_path_lon) return false;
+      if (ellipse_path_z != other__.ellipse_path_z) return false;
+      if (ellipse_path_a != other__.ellipse_path_a) return false;
+      if (ellipse_path_b != other__.ellipse_path_b) return false;
+      if (ellipse_path_c != other__.ellipse_path_c) return false;
+      if (ellipse_path_clockwise != other__.ellipse_path_clockwise) return false;
+      if (ellipse_path_psi != other__.ellipse_path_psi) return false;
+      if (ellipse_path_z_freq != other__.ellipse_path_z_freq) return false;
+      if (ellipse_path_phi0 != other__.ellipse_path_phi0) return false;
+      if (ellipse_path_z_phi0 != other__.ellipse_path_z_phi0) return false;
+      if (waypoint_path_lat != other__.waypoint_path_lat) return false;
+      if (waypoint_path_lon != other__.waypoint_path_lon) return false;
+      if (waypoint_path_x != other__.waypoint_path_x) return false;
+      if (waypoint_path_y != other__.waypoint_path_y) return false;
+      if (waypoint_path_z != other__.waypoint_path_z) return false;
+      if (waypoint_radius != other__.waypoint_radius) return false;
       if (los_lookahead != other__.los_lookahead) return false;
       if (los_speed != other__.los_speed) return false;
       if (los_gain != other__.los_gain) return false;
@@ -28381,6 +28395,8 @@ namespace DUNE
       if (oa_hysteresis != other__.oa_hysteresis) return false;
       if (obs_lat != other__.obs_lat) return false;
       if (obs_lon != other__.obs_lon) return false;
+      if (obs_x != other__.obs_x) return false;
+      if (obs_y != other__.obs_y) return false;
       if (obs_vx != other__.obs_vx) return false;
       if (obs_vy != other__.obs_vy) return false;
       return true;
@@ -28396,17 +28412,23 @@ namespace DUNE
     NSBParameters::serializeFields(uint8_t* bfr__) const
     {
       uint8_t* ptr__ = bfr__;
-      ptr__ += IMC::serialize(path_lat, ptr__);
-      ptr__ += IMC::serialize(path_lon, ptr__);
-      ptr__ += IMC::serialize(path_z, ptr__);
-      ptr__ += IMC::serialize(path_a, ptr__);
-      ptr__ += IMC::serialize(path_b, ptr__);
-      ptr__ += IMC::serialize(path_c, ptr__);
-      ptr__ += IMC::serialize(path_clockwise, ptr__);
-      ptr__ += IMC::serialize(path_psi, ptr__);
-      ptr__ += IMC::serialize(path_z_freq, ptr__);
-      ptr__ += IMC::serialize(path_phi0, ptr__);
-      ptr__ += IMC::serialize(path_z_phi0, ptr__);
+      ptr__ += IMC::serialize(ellipse_path_lat, ptr__);
+      ptr__ += IMC::serialize(ellipse_path_lon, ptr__);
+      ptr__ += IMC::serialize(ellipse_path_z, ptr__);
+      ptr__ += IMC::serialize(ellipse_path_a, ptr__);
+      ptr__ += IMC::serialize(ellipse_path_b, ptr__);
+      ptr__ += IMC::serialize(ellipse_path_c, ptr__);
+      ptr__ += IMC::serialize(ellipse_path_clockwise, ptr__);
+      ptr__ += IMC::serialize(ellipse_path_psi, ptr__);
+      ptr__ += IMC::serialize(ellipse_path_z_freq, ptr__);
+      ptr__ += IMC::serialize(ellipse_path_phi0, ptr__);
+      ptr__ += IMC::serialize(ellipse_path_z_phi0, ptr__);
+      ptr__ += IMC::serialize(waypoint_path_lat, ptr__);
+      ptr__ += IMC::serialize(waypoint_path_lon, ptr__);
+      ptr__ += IMC::serialize(waypoint_path_x, ptr__);
+      ptr__ += IMC::serialize(waypoint_path_y, ptr__);
+      ptr__ += IMC::serialize(waypoint_path_z, ptr__);
+      ptr__ += IMC::serialize(waypoint_radius, ptr__);
       ptr__ += IMC::serialize(los_lookahead, ptr__);
       ptr__ += IMC::serialize(los_speed, ptr__);
       ptr__ += IMC::serialize(los_gain, ptr__);
@@ -28421,6 +28443,8 @@ namespace DUNE
       ptr__ += IMC::serialize(oa_hysteresis, ptr__);
       ptr__ += IMC::serialize(obs_lat, ptr__);
       ptr__ += IMC::serialize(obs_lon, ptr__);
+      ptr__ += IMC::serialize(obs_x, ptr__);
+      ptr__ += IMC::serialize(obs_y, ptr__);
       ptr__ += IMC::serialize(obs_vx, ptr__);
       ptr__ += IMC::serialize(obs_vy, ptr__);
       return ptr__;
@@ -28430,17 +28454,23 @@ namespace DUNE
     NSBParameters::deserializeFields(const uint8_t* bfr__, uint16_t size__)
     {
       const uint8_t* start__ = bfr__;
-      bfr__ += IMC::deserialize(path_lat, bfr__, size__);
-      bfr__ += IMC::deserialize(path_lon, bfr__, size__);
-      bfr__ += IMC::deserialize(path_z, bfr__, size__);
-      bfr__ += IMC::deserialize(path_a, bfr__, size__);
-      bfr__ += IMC::deserialize(path_b, bfr__, size__);
-      bfr__ += IMC::deserialize(path_c, bfr__, size__);
-      bfr__ += IMC::deserialize(path_clockwise, bfr__, size__);
-      bfr__ += IMC::deserialize(path_psi, bfr__, size__);
-      bfr__ += IMC::deserialize(path_z_freq, bfr__, size__);
-      bfr__ += IMC::deserialize(path_phi0, bfr__, size__);
-      bfr__ += IMC::deserialize(path_z_phi0, bfr__, size__);
+      bfr__ += IMC::deserialize(ellipse_path_lat, bfr__, size__);
+      bfr__ += IMC::deserialize(ellipse_path_lon, bfr__, size__);
+      bfr__ += IMC::deserialize(ellipse_path_z, bfr__, size__);
+      bfr__ += IMC::deserialize(ellipse_path_a, bfr__, size__);
+      bfr__ += IMC::deserialize(ellipse_path_b, bfr__, size__);
+      bfr__ += IMC::deserialize(ellipse_path_c, bfr__, size__);
+      bfr__ += IMC::deserialize(ellipse_path_clockwise, bfr__, size__);
+      bfr__ += IMC::deserialize(ellipse_path_psi, bfr__, size__);
+      bfr__ += IMC::deserialize(ellipse_path_z_freq, bfr__, size__);
+      bfr__ += IMC::deserialize(ellipse_path_phi0, bfr__, size__);
+      bfr__ += IMC::deserialize(ellipse_path_z_phi0, bfr__, size__);
+      bfr__ += IMC::deserialize(waypoint_path_lat, bfr__, size__);
+      bfr__ += IMC::deserialize(waypoint_path_lon, bfr__, size__);
+      bfr__ += IMC::deserialize(waypoint_path_x, bfr__, size__);
+      bfr__ += IMC::deserialize(waypoint_path_y, bfr__, size__);
+      bfr__ += IMC::deserialize(waypoint_path_z, bfr__, size__);
+      bfr__ += IMC::deserialize(waypoint_radius, bfr__, size__);
       bfr__ += IMC::deserialize(los_lookahead, bfr__, size__);
       bfr__ += IMC::deserialize(los_speed, bfr__, size__);
       bfr__ += IMC::deserialize(los_gain, bfr__, size__);
@@ -28455,6 +28485,8 @@ namespace DUNE
       bfr__ += IMC::deserialize(oa_hysteresis, bfr__, size__);
       bfr__ += IMC::deserialize(obs_lat, bfr__, size__);
       bfr__ += IMC::deserialize(obs_lon, bfr__, size__);
+      bfr__ += IMC::deserialize(obs_x, bfr__, size__);
+      bfr__ += IMC::deserialize(obs_y, bfr__, size__);
       bfr__ += IMC::deserialize(obs_vx, bfr__, size__);
       bfr__ += IMC::deserialize(obs_vy, bfr__, size__);
       return bfr__ - start__;
@@ -28464,17 +28496,23 @@ namespace DUNE
     NSBParameters::reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__)
     {
       const uint8_t* start__ = bfr__;
-      bfr__ += IMC::reverseDeserialize(path_lat, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(path_lon, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(path_z, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(path_a, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(path_b, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(path_c, bfr__, size__);
-      bfr__ += IMC::deserialize(path_clockwise, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(path_psi, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(path_z_freq, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(path_phi0, bfr__, size__);
-      bfr__ += IMC::reverseDeserialize(path_z_phi0, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(ellipse_path_lat, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(ellipse_path_lon, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(ellipse_path_z, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(ellipse_path_a, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(ellipse_path_b, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(ellipse_path_c, bfr__, size__);
+      bfr__ += IMC::deserialize(ellipse_path_clockwise, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(ellipse_path_psi, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(ellipse_path_z_freq, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(ellipse_path_phi0, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(ellipse_path_z_phi0, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(waypoint_path_lat, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(waypoint_path_lon, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(waypoint_path_x, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(waypoint_path_y, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(waypoint_path_z, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(waypoint_radius, bfr__, size__);
       bfr__ += IMC::reverseDeserialize(los_lookahead, bfr__, size__);
       bfr__ += IMC::reverseDeserialize(los_speed, bfr__, size__);
       bfr__ += IMC::reverseDeserialize(los_gain, bfr__, size__);
@@ -28489,6 +28527,8 @@ namespace DUNE
       bfr__ += IMC::reverseDeserialize(oa_hysteresis, bfr__, size__);
       bfr__ += IMC::reverseDeserialize(obs_lat, bfr__, size__);
       bfr__ += IMC::reverseDeserialize(obs_lon, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(obs_x, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(obs_y, bfr__, size__);
       bfr__ += IMC::reverseDeserialize(obs_vx, bfr__, size__);
       bfr__ += IMC::reverseDeserialize(obs_vy, bfr__, size__);
       return bfr__ - start__;
@@ -28497,17 +28537,23 @@ namespace DUNE
     void
     NSBParameters::fieldsToJSON(std::ostream& os__, unsigned nindent__) const
     {
-      IMC::toJSON(os__, "path_lat", path_lat, nindent__);
-      IMC::toJSON(os__, "path_lon", path_lon, nindent__);
-      IMC::toJSON(os__, "path_z", path_z, nindent__);
-      IMC::toJSON(os__, "path_a", path_a, nindent__);
-      IMC::toJSON(os__, "path_b", path_b, nindent__);
-      IMC::toJSON(os__, "path_c", path_c, nindent__);
-      IMC::toJSON(os__, "path_clockwise", path_clockwise, nindent__);
-      IMC::toJSON(os__, "path_psi", path_psi, nindent__);
-      IMC::toJSON(os__, "path_z_freq", path_z_freq, nindent__);
-      IMC::toJSON(os__, "path_phi0", path_phi0, nindent__);
-      IMC::toJSON(os__, "path_z_phi0", path_z_phi0, nindent__);
+      IMC::toJSON(os__, "ellipse_path_lat", ellipse_path_lat, nindent__);
+      IMC::toJSON(os__, "ellipse_path_lon", ellipse_path_lon, nindent__);
+      IMC::toJSON(os__, "ellipse_path_z", ellipse_path_z, nindent__);
+      IMC::toJSON(os__, "ellipse_path_a", ellipse_path_a, nindent__);
+      IMC::toJSON(os__, "ellipse_path_b", ellipse_path_b, nindent__);
+      IMC::toJSON(os__, "ellipse_path_c", ellipse_path_c, nindent__);
+      IMC::toJSON(os__, "ellipse_path_clockwise", ellipse_path_clockwise, nindent__);
+      IMC::toJSON(os__, "ellipse_path_psi", ellipse_path_psi, nindent__);
+      IMC::toJSON(os__, "ellipse_path_z_freq", ellipse_path_z_freq, nindent__);
+      IMC::toJSON(os__, "ellipse_path_phi0", ellipse_path_phi0, nindent__);
+      IMC::toJSON(os__, "ellipse_path_z_phi0", ellipse_path_z_phi0, nindent__);
+      IMC::toJSON(os__, "waypoint_path_lat", waypoint_path_lat, nindent__);
+      IMC::toJSON(os__, "waypoint_path_lon", waypoint_path_lon, nindent__);
+      IMC::toJSON(os__, "waypoint_path_x", waypoint_path_x, nindent__);
+      IMC::toJSON(os__, "waypoint_path_y", waypoint_path_y, nindent__);
+      IMC::toJSON(os__, "waypoint_path_z", waypoint_path_z, nindent__);
+      IMC::toJSON(os__, "waypoint_radius", waypoint_radius, nindent__);
       IMC::toJSON(os__, "los_lookahead", los_lookahead, nindent__);
       IMC::toJSON(os__, "los_speed", los_speed, nindent__);
       IMC::toJSON(os__, "los_gain", los_gain, nindent__);
@@ -28522,6 +28568,8 @@ namespace DUNE
       IMC::toJSON(os__, "oa_hysteresis", oa_hysteresis, nindent__);
       IMC::toJSON(os__, "obs_lat", obs_lat, nindent__);
       IMC::toJSON(os__, "obs_lon", obs_lon, nindent__);
+      IMC::toJSON(os__, "obs_x", obs_x, nindent__);
+      IMC::toJSON(os__, "obs_y", obs_y, nindent__);
       IMC::toJSON(os__, "obs_vx", obs_vx, nindent__);
       IMC::toJSON(os__, "obs_vy", obs_vy, nindent__);
     }
