@@ -1,23 +1,41 @@
 import wgs84
 import subprocess
 import numpy as np
+from enum import Enum
 
 ## Parameters
 lat0 = np.deg2rad(63.435853) # origin latitude
 lon0 = np.deg2rad(10.357786) # origin longitude
 depth = 0.
+# Elliptical path
 a = 100. # semimajor axis
 b = 80. # semiminor axis
 c = 0. # depth oscillations
+# Waypoints
 wp_offset_x = 70.
 wp_offset_y = 0.
 wp_offset_z = 0.
 wp_radius = 50.
 wp_length = 250.
-x_obstacle = '0., -100.'
-y_obstacle = '80., 0.'
-v_x_obstacle = '0., 0.'
-v_y_obstacle = '0., 0.'
+# Obstacle settings
+class ObstacleMode(Enum):
+    NOTHING = 0
+    ELLIPSE = 1
+    CROSS = 2
+    HEADON = 3    
+x_obstacle_ellipse = [0., -100.]
+y_obstacle_ellipse = [80., 0.]
+v_x_obstacle_ellipse = [0., 0.]
+v_y_obstacle_ellipse = [0., 0.]
+x_obstacle_cross = [105.+wp_offset_x, 95.+wp_offset_x]
+y_obstacle_cross = [-34.0+wp_offset_y, 36.4+wp_offset_y]
+v_x_obstacle_cross = [0., 0.]
+v_y_obstacle_cross = [0.393, -0.393]
+x_obstacle_headon = [73.1+wp_offset_x, -7.8+wp_offset_x]
+y_obstacle_headon = [0.+wp_offset_y, 100.+wp_offset_y]
+v_x_obstacle_headon = [0.4, 0.4]
+v_y_obstacle_headon = [0., 0.]
+# NSB
 formation_shape = [[0., -25., 0.], [0., 25., 0.], [25., 0., 0.], [-25., 0., 0.]]
 initial_positions_ellipse = [[a+40., -10., 0.], [a-20., -10., 0.], [a+10., 25., 0.], [a+10., -45., 0.]]
 initial_positions_wp = [[wp_offset_x-10., wp_offset_y-50., 0.], [wp_offset_x-10., wp_offset_y, 0.], [wp_offset_x+25., wp_offset_y-25., 0.], [wp_offset_x-45., wp_offset_y-25., 0.]]
@@ -71,8 +89,37 @@ def set_path_parameters(vehicle_list):
                          'Waypoints -- Depth', wp_z,
                          'Waypoints -- Dubins Radius', str(wp_radius)])
         
-def set_obstacle(vehicle_list):
-     for v in vehicle_list:
+def array2string(arr):
+    if len(arr) == 0:
+        return ''
+    out = str(arr[0])
+    if len(arr) > 1:
+        for i in range(1, len(arr)):
+            out += ', {}'.format(arr[i])
+    return out
+        
+def set_obstacle(vehicle_list, mode:ObstacleMode=ObstacleMode.NOTHING):
+    if (mode==ObstacleMode.NOTHING):
+        x_obstacle = ''
+        y_obstacle = ''
+        v_x_obstacle = ''
+        v_y_obstacle = ''
+    elif (mode==ObstacleMode.ELLIPSE):
+        x_obstacle = array2string(x_obstacle_ellipse)
+        y_obstacle = array2string(y_obstacle_ellipse)
+        v_x_obstacle = array2string(v_x_obstacle_ellipse)
+        v_y_obstacle = array2string(v_y_obstacle_ellipse)
+    elif (mode==ObstacleMode.CROSS):
+        x_obstacle = array2string(x_obstacle_cross)
+        y_obstacle = array2string(y_obstacle_cross)
+        v_x_obstacle = array2string(v_x_obstacle_cross)
+        v_y_obstacle = array2string(v_y_obstacle_cross)
+    elif (mode==ObstacleMode.HEADON):
+        x_obstacle = array2string(x_obstacle_headon)
+        y_obstacle = array2string(y_obstacle_headon)
+        v_x_obstacle = array2string(v_x_obstacle_headon)
+        v_y_obstacle = array2string(v_y_obstacle_headon)
+    for v in vehicle_list:
         set_parameters(v, 'NSB Parameters',
                         ['Obstacle -- Origin Latitude', str(lat0),
                          'Obstacle -- Origin Longitude', str(lon0),
@@ -122,11 +169,12 @@ if __name__ == '__main__':
     vehicles = input().split(' ')
     print('Use ellipse (Y/n)?')
     use_ellipse = input().lower() != 'n'
-    print('Use obstacle (y/N)?')
-    use_obstacle = input().lower() == 'y'
+    print('Enter obstacle mode (0=none, 1=ellipse, 2=cross, 3=head-on):')
+    mode = ObstacleMode(int(input()))
+    use_obstacle = (mode != ObstacleMode.NOTHING)
 
     set_formation_shape(vehicles)
     set_path_parameters(vehicles)
-    set_obstacle(vehicles)
+    set_obstacle(vehicles, mode)
     set_plan_generator(vehicles, use_obstacle, use_ellipse)
     set_nsb(vehicles, use_ellipse)

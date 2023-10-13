@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 29f572aeb47905e5a14c6967638f6a58                            *
+// IMC XML MD5: 58825b3e2a70188420fab006d9d22775                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_DEFINITIONS_HPP_INCLUDED_
@@ -26854,6 +26854,8 @@ namespace DUNE
       fp64_t oa_cone;
       //! Obstacle Avoidance Hysteresis.
       fp64_t oa_hysteresis;
+      //! Obstacle Avoidance Recovery Angle.
+      fp64_t oa_recovery;
       //! Obstacle Initial Latitude.
       fp64_t obs_lat;
       //! Obstacle Initial Longitude.
@@ -26914,7 +26916,7 @@ namespace DUNE
       unsigned
       getFixedSerializationSize(void) const
       {
-        return 210;
+        return 218;
       }
 
       unsigned

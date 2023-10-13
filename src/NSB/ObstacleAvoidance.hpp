@@ -70,14 +70,7 @@ namespace NSB
           Vector2D relative_position, relative_velocity, obstacle_velocity;
           double cone_angle;
           bool is_in_cone, hysteresis;
-        };  
-
-        struct AvoidanceManeuver
-        {
-          uint16_t obstacle_id;
-          uint8_t direction;
-          float v_x, v_y;
-        };      
+        };       
 
         //! Returns the information about the obstacle
         ObstacleInfo
@@ -96,7 +89,7 @@ namespace NSB
           if (avoidance_radius < distance)
             info.cone_angle = std::asin(avoidance_radius / distance);
           else
-            info.cone_angle = M_PI_2;
+            info.cone_angle = M_PI_2 + m_recovery * (avoidance_radius - distance) / avoidance_radius;
 
           double speed = norm(info.relative_velocity);
 
@@ -140,41 +133,16 @@ namespace NSB
             return OA_DIRECTION_NONE;
         }
 
-        AvoidanceManeuver
-        generateAvoidanceManeuver(ObstacleInfo& oinf, uint16_t oid, uint8_t direction)
+        Vector2D
+        generateAvoidanceManeuver(ObstacleInfo& oinf, uint8_t direction)
         {
-          AvoidanceManeuver man;
+          Vector2D man;
           double desired_course = std::atan2(oinf.relative_position.y, oinf.relative_position.x) + getDirection(direction)*oinf.cone_angle;
           double speed = norm(oinf.relative_velocity);
-          man.v_x = speed*std::cos(desired_course) + oinf.obstacle_velocity.x;
-          man.v_y = speed*std::sin(desired_course) + oinf.obstacle_velocity.y;
-          man.direction = direction;
-          man.obstacle_id = oid;
+          man.x = speed*std::cos(desired_course) + oinf.obstacle_velocity.x;
+          man.y = speed*std::sin(desired_course) + oinf.obstacle_velocity.y;
 
           return man;
-        }
-
-        bool
-        validateAvoidanceManeuver(float own_x, float own_y, std::map<uint16_t, ObstacleInfo>& active_obstacles, 
-          std::map<uint16_t, ObstacleState>& obstacles, const AvoidanceManeuver& man, float extra_avoidance_radius)
-        {
-          if (!contains(active_obstacles, man.obstacle_id))
-            return false;
-
-          bool is_feasible = true;
-          for (auto pair: active_obstacles)
-          {
-            if (pair.first != man.obstacle_id)
-            {
-              ObstacleInfo oinf = getObstacleInfo(own_x, own_y, man.v_x, man.v_y, obstacles[pair.first], extra_avoidance_radius);
-              if (oinf.is_in_cone)
-              {
-                is_feasible = false;
-                break;
-              }
-            }
-          }
-          return is_feasible;
         }
 
       public:
@@ -185,6 +153,8 @@ namespace NSB
         float m_obstacle_radius; 
         //! Hysteresis of collision detection
         double m_hysteresis;
+        //! Recovery angle
+        double m_recovery;
 
         //! Initialize with default parameters
         ObstacleAvoidance():
@@ -192,40 +162,23 @@ namespace NSB
           m_last_obstacle(0U),
           m_cone_min(Angles::radians(5.))
         {        
-        }
+        }   
 
         //! Initialize with custom parameters
-        ObstacleAvoidance(double cone_min):
-          m_last_direction(OA_DIRECTION_NONE),
-          m_last_obstacle(0U)
-        {
-          m_cone_min = cone_min;
-          m_hysteresis = 0.;
-        }    
-
-        //! Initialize with custom parameters
-        ObstacleAvoidance(double cone_min, double hysteresis):
-          m_last_direction(OA_DIRECTION_NONE),
-          m_last_obstacle(0U)
-        {
-          m_cone_min = cone_min;
-          m_hysteresis = hysteresis;
-        }    
-
-        //! Initialize with custom parameters
-        ObstacleAvoidance(double cone_min, double hysteresis, double obstacle_radius):
+        ObstacleAvoidance(double cone_min, double hysteresis, double obstacle_radius, double recovery):
           m_last_direction(OA_DIRECTION_NONE),
           m_last_obstacle(0U)
         {
           m_cone_min = cone_min;
           m_hysteresis = hysteresis;
           m_obstacle_radius = obstacle_radius;
+          m_recovery = recovery;
         }   
 
         //! Performs the obstacle avoidance algorithm.
         //! The new desired velocity vector is written into own velocities.
         inline void
-        step(float own_x, float own_y, std::map<uint16_t, ObstacleState>& obs, float extra_avoidance_radius, double& own_vx, double& own_vy, DUNE::Tasks::Task* task = nullptr)
+        step(float own_x, float own_y, std::map<uint16_t, ObstacleState>& obs, float extra_avoidance_radius, double vx_ref, double vy_ref, double& own_vx, double& own_vy, DUNE::Tasks::Task* task = nullptr)
         {
           std::map<uint16_t, ObstacleInfo> active_obstacles;
           for (auto pair: obs)
@@ -239,67 +192,76 @@ namespace NSB
 
           if (active_obstacles.size() == 0) // No active obstacles; exit
           {
+            if ((task != nullptr) && (m_last_direction != OA_DIRECTION_NONE))
+              task->debug("Exited avoidance maneuver");
             m_last_direction = OA_DIRECTION_NONE;
             return;
           }
 
-          // Find feasible avoidance maneuvers  
-          std::vector<AvoidanceManeuver> feasible_maneuvers;
+          Vector2D reference;
+          if ((m_last_direction != OA_DIRECTION_NONE) && contains(active_obstacles, m_last_obstacle))
+          {
+            reference = generateAvoidanceManeuver(active_obstacles[m_last_obstacle], m_last_direction);
+          }
+          else
+          {
+            reference.x = vx_ref;
+            reference.y = vy_ref;
+          }
+
+          // Find the closest obstacle
+          uint16_t closest_obstacle;
+          double d_min = 1e9;
           for (auto pair: active_obstacles)
           {
-            // Generate and check a starboard avoidance maneuver
-            AvoidanceManeuver man = generateAvoidanceManeuver(pair.second, pair.first, OA_DIRECTION_STARBOARD);
-            if (validateAvoidanceManeuver(own_x, own_y, active_obstacles, obs, man, extra_avoidance_radius))
-              feasible_maneuvers.push_back(man);
-
-            // Generate and check a port avoidance maneuver
-            man = generateAvoidanceManeuver(pair.second, pair.first, OA_DIRECTION_PORT);
-            if (validateAvoidanceManeuver(own_x, own_y, active_obstacles, obs, man, extra_avoidance_radius))
-              feasible_maneuvers.push_back(man);
-          }
-
-          // Check if we can use the maneuver from the previous step
-          bool can_use_previous = false;
-          size_t i = 0;
-          for (; i < feasible_maneuvers.size(); i++)
-          {
-            if ((feasible_maneuvers[i].direction == m_last_direction) && (feasible_maneuvers[i].obstacle_id == m_last_obstacle))
+            double d_i = norm(pair.second.relative_position);
+            if (d_i < d_min)
             {
-              can_use_previous = true;
-              break;
+              d_min = d_i;
+              closest_obstacle = pair.first;
             }
           }
-          if (can_use_previous)
-          {
-            own_vx = feasible_maneuvers[i].v_x;
-            own_vy = feasible_maneuvers[i].v_y;
 
+          // Check if we can use the previous maneuver
+          if ((m_last_direction != OA_DIRECTION_NONE) && (closest_obstacle == m_last_obstacle))
+          {
+            own_vx = reference.x;
+            own_vy = reference.y;
             return;
           }
 
-          // If we cannot use the previous maneuver, try to minimize deviation
-          double best_velocity_product(-1e9), velocity_product_i;
-          Vector2D v_d;
-          v_d.x = own_vx;
-          v_d.y = own_vy;
-          for (i = 0; i < feasible_maneuvers.size(); i++)
+          // If not, minimize deviation
+          m_last_obstacle = closest_obstacle;
+          Vector2D man_starboard = generateAvoidanceManeuver(active_obstacles[closest_obstacle], OA_DIRECTION_STARBOARD);
+          Vector2D man_port = generateAvoidanceManeuver(active_obstacles[closest_obstacle], OA_DIRECTION_PORT);
+          if (dot(man_starboard, reference) > dot(man_port, reference))
           {
-            velocity_product_i = feasible_maneuvers[i].v_x * own_vx + feasible_maneuvers[i].v_y * own_vy;
-            if (velocity_product_i > best_velocity_product)
-            {
-              best_velocity_product = velocity_product_i;
-              v_d.x = feasible_maneuvers[i].v_x;
-              v_d.y = feasible_maneuvers[i].v_y;
-              m_last_obstacle = feasible_maneuvers[i].obstacle_id;
-              m_last_direction = feasible_maneuvers[i].direction;
-            }
+            own_vx = man_starboard.x;
+            own_vy = man_starboard.y;
+            m_last_direction = OA_DIRECTION_STARBOARD;
           }
-          own_vx = v_d.x;
-          own_vy = v_d.y;
+          else
+          {
+            own_vx = man_port.x;
+            own_vy = man_port.y;
+            m_last_direction = OA_DIRECTION_PORT;
+          }
+
+          if (task != nullptr)
+          {
+            task->debug("Avoidance maneuver changed to: obstacle %u, direction %u", m_last_obstacle, (uint16_t)m_last_direction);
+            std::ostringstream debug_msg;
+            debug_msg << "Active obstacles: ";
+            for (auto pair: active_obstacles)
+            {
+              debug_msg << pair.first << " ";
+            }
+            task->debug(debug_msg.str().c_str());
+          }
         }
 
         inline void
-        step(float own_x, float own_y, std::map<uint16_t, ObstacleState>& obs, float extra_avoidance_radius, LineOfSight::LineOfSightOutput& out, DUNE::Tasks::Task* task = nullptr)
+        step(float own_x, float own_y, std::map<uint16_t, ObstacleState>& obs, float extra_avoidance_radius, const GeometricPath::PathPoint& path_point, LineOfSight::LineOfSightOutput& out, DUNE::Tasks::Task* task = nullptr)
         {
           Vector2D v_LOS_initial, v_LOS_final;
           double inv_norm;
@@ -308,7 +270,7 @@ namespace NSB
           v_LOS_initial.x = out.velocity.x * inv_norm;
           v_LOS_initial.y = out.velocity.y * inv_norm;
           // Perform obstacle avoidance
-          step(own_x, own_y, obs, extra_avoidance_radius, out.velocity.x, out.velocity.y, task);
+          step(own_x, own_y, obs, extra_avoidance_radius, path_point.p_diff.x, path_point.p_diff.y, out.velocity.x, out.velocity.y, task);
           // Calculate the normalized LOS vector after obstacle avoidance
           inv_norm = std::pow(square(out.velocity.x) + square(out.velocity.y), -0.5);
           v_LOS_final.x = out.velocity.x * inv_norm;

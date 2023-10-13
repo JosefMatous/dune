@@ -111,6 +111,7 @@ namespace NSB
       oa.m_cone_min = param->oa_cone;
       oa.m_obstacle_radius = param->oa_radius;
       oa.m_hysteresis = param->oa_hysteresis;
+      oa.m_recovery = param->oa_recovery;
     }
 }
 

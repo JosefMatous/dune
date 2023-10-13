@@ -202,8 +202,10 @@ namespace NSB
         }
         if (isActive())
         {
+          GeometricPath::PathPoint path_point;
           GeometricPath::PathReference path_ref;
-          m_path.getPathReference(m_path_parameter, path_ref);
+          m_path.evaluatePathFunction(m_path_parameter, path_point);
+          m_path.getPathReference(path_point, path_ref);
 
           //debug("Vehicle at x = %.2f, y = %.2f", msg->x, msg->y);
           //debug("Path reference: x = %.2f, y = %.2f, z = %.2f", path_ref.x, path_ref.y, path_ref.z);
@@ -223,7 +225,7 @@ namespace NSB
           if (m_has_obstacle)
           {
             m_obs_est.simulate(Clock::getSinceEpoch());
-            m_obs_avoid.step(msg->x, msg->y, m_obs_est.m_obstacle_states, 0., out);
+            m_obs_avoid.step(msg->x, msg->y, m_obs_est.m_obstacle_states, 0., path_point, out);
             //debug("LOS vector after OA: x = %.2f, y = %.2f, z = %.2f", out.velocity.x, out.velocity.y, out.velocity.z);
           }
 

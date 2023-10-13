@@ -44,13 +44,15 @@ namespace NSB
     inline void
     nsb_simulator_step(EstimatorParameters& params, std::map<uint16_t, ObstacleState>& obs, StateEstimate& nsb_state)
     {
+      GeometricPath::PathPoint point;
       GeometricPath::PathReference ref;
-      params.path->getPathReference(nsb_state.path_param, ref);
+      params.path->evaluatePathFunction(nsb_state.path_param, point);
+      params.path->getPathReference(point, ref);
       Vector3D err;
       params.path->getPathFollowingError(ref, nsb_state.p_b.x, nsb_state.p_b.y, nsb_state.p_b.z, err);
       LineOfSight::LineOfSightOutput out;
       params.los->step(ref, err, out);
-      params.oa->step(nsb_state.p_b.x, nsb_state.p_b.y, obs, nsb_state.r_f, out);
+      params.oa->step(nsb_state.p_b.x, nsb_state.p_b.y, obs, nsb_state.r_f, point, out);
 
       // Euler integration
       nsb_state.p_b.x += out.velocity.x * params.delta_t;

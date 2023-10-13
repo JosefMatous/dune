@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: 29f572aeb47905e5a14c6967638f6a58                            *
+// IMC XML MD5: 58825b3e2a70188420fab006d9d22775                            *
 //***************************************************************************
 
 // ISO C++ 98 headers.
@@ -28352,6 +28352,7 @@ namespace DUNE
       oa_radius = 0;
       oa_cone = 0;
       oa_hysteresis = 0;
+      oa_recovery = 0;
       obs_lat = 0;
       obs_lon = 0;
       obs_x.clear();
@@ -28393,6 +28394,7 @@ namespace DUNE
       if (oa_radius != other__.oa_radius) return false;
       if (oa_cone != other__.oa_cone) return false;
       if (oa_hysteresis != other__.oa_hysteresis) return false;
+      if (oa_recovery != other__.oa_recovery) return false;
       if (obs_lat != other__.obs_lat) return false;
       if (obs_lon != other__.obs_lon) return false;
       if (obs_x != other__.obs_x) return false;
@@ -28441,6 +28443,7 @@ namespace DUNE
       ptr__ += IMC::serialize(oa_radius, ptr__);
       ptr__ += IMC::serialize(oa_cone, ptr__);
       ptr__ += IMC::serialize(oa_hysteresis, ptr__);
+      ptr__ += IMC::serialize(oa_recovery, ptr__);
       ptr__ += IMC::serialize(obs_lat, ptr__);
       ptr__ += IMC::serialize(obs_lon, ptr__);
       ptr__ += IMC::serialize(obs_x, ptr__);
@@ -28483,6 +28486,7 @@ namespace DUNE
       bfr__ += IMC::deserialize(oa_radius, bfr__, size__);
       bfr__ += IMC::deserialize(oa_cone, bfr__, size__);
       bfr__ += IMC::deserialize(oa_hysteresis, bfr__, size__);
+      bfr__ += IMC::deserialize(oa_recovery, bfr__, size__);
       bfr__ += IMC::deserialize(obs_lat, bfr__, size__);
       bfr__ += IMC::deserialize(obs_lon, bfr__, size__);
       bfr__ += IMC::deserialize(obs_x, bfr__, size__);
@@ -28525,6 +28529,7 @@ namespace DUNE
       bfr__ += IMC::reverseDeserialize(oa_radius, bfr__, size__);
       bfr__ += IMC::reverseDeserialize(oa_cone, bfr__, size__);
       bfr__ += IMC::reverseDeserialize(oa_hysteresis, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(oa_recovery, bfr__, size__);
       bfr__ += IMC::reverseDeserialize(obs_lat, bfr__, size__);
       bfr__ += IMC::reverseDeserialize(obs_lon, bfr__, size__);
       bfr__ += IMC::reverseDeserialize(obs_x, bfr__, size__);
@@ -28566,6 +28571,7 @@ namespace DUNE
       IMC::toJSON(os__, "oa_radius", oa_radius, nindent__);
       IMC::toJSON(os__, "oa_cone", oa_cone, nindent__);
       IMC::toJSON(os__, "oa_hysteresis", oa_hysteresis, nindent__);
+      IMC::toJSON(os__, "oa_recovery", oa_recovery, nindent__);
       IMC::toJSON(os__, "obs_lat", obs_lat, nindent__);
       IMC::toJSON(os__, "obs_lon", obs_lon, nindent__);
       IMC::toJSON(os__, "obs_x", obs_x, nindent__);

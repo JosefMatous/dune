@@ -292,11 +292,18 @@ namespace NSB
       inline void
       simulator_step(double& t)
       {
+        GeometricPath::PathPoint path_point;
         GeometricPath::PathReference path_ref;
         if (m_params.use_ellipse)
-          m_ellipse_path.getPathReference(m_nsb_state.path_param, path_ref);
+        {
+          m_ellipse_path.evaluatePathFunction(m_nsb_state.path_param, path_point);
+          m_ellipse_path.getPathReference(path_point, path_ref);
+        }
         else
-          m_waypoint_path.getPathReference(m_nsb_state.path_param, path_ref);
+        {
+          m_waypoint_path.evaluatePathFunction(m_nsb_state.path_param, path_point);
+          m_waypoint_path.getPathReference(path_point, path_ref);
+        }
         //debug("Path at [%.2f, %.2f, %.2f]", path_ref.x, path_ref.y, path_ref.z);
         //debug("Barycenter at [%.2f, %.2f, %.2f]", m_nsb_state.x, m_nsb_state.y, m_nsb_state.z);
 
@@ -309,7 +316,7 @@ namespace NSB
 
         if (m_params.use_obstacle)
         {
-          m_obs_avoid.step(m_nsb_state.x, m_nsb_state.y, m_obstacle_states, m_nsb_state.r_f, los_out, this);
+          m_obs_avoid.step(m_nsb_state.x, m_nsb_state.y, m_obstacle_states, m_nsb_state.r_f, path_point, los_out);
           //debug("LOS vector after OA: x = %.2f, y = %.2f, z = %.2f", los_out.velocity.x, los_out.velocity.y, los_out.velocity.z);
         }
 

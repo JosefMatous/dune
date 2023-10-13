@@ -156,6 +156,10 @@ namespace NSB
           .defaultValue("3")
           .minimumValue("0")
           .maximumValue("10");
+        param("Obstacle Avoidance -- Recovery Angle", m_params.oa_recovery)
+          .defaultValue("5")
+          .minimumValue("0")
+          .maximumValue("15");
 
         param("Obstacle -- Origin Latitude", m_params.obs_lat)
           .defaultValue("0.7188139"); 
@@ -185,6 +189,8 @@ namespace NSB
           m_params.oa_cone = Angles::radians(m_params.oa_cone);
         if (paramChanged(m_params.oa_hysteresis))
           m_params.oa_hysteresis = Angles::radians(m_params.oa_hysteresis);
+        if (paramChanged(m_params.oa_recovery))
+          m_params.oa_recovery = Angles::radians(m_params.oa_recovery);
         convertParamsToMessage();
         dispatch(m_params);
       }
