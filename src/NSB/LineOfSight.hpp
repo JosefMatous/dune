@@ -74,6 +74,7 @@ namespace NSB
         {
           Vector3D velocity;
           double path_parameter_derivative;
+          double path_progress;
         };      
 
         void
@@ -111,7 +112,8 @@ namespace NSB
           out.velocity.z = U_LOS * (R[2][0]*lookahead - R[2][1]*path_error.y - R[2][2]*path_error.z);
 
           // Path parameter update law
-          out.path_parameter_derivative = m_speed * (lookahead/D + m_parameter_gain*path_error.x/std::sqrt(square(path_error.x) + 1)) / path_ref.gradient;
+          out.path_progress = m_speed * lookahead / D / path_ref.gradient;
+          out.path_parameter_derivative = out.path_progress + m_speed * (m_parameter_gain*path_error.x/std::sqrt(square(path_error.x) + 1)) / path_ref.gradient;
         }
     };    
 }

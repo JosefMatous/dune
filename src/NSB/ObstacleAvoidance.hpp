@@ -263,20 +263,16 @@ namespace NSB
         inline void
         step(float own_x, float own_y, std::map<uint16_t, ObstacleState>& obs, float extra_avoidance_radius, const GeometricPath::PathPoint& path_point, LineOfSight::LineOfSightOutput& out, DUNE::Tasks::Task* task = nullptr)
         {
-          Vector2D v_LOS_initial, v_LOS_final;
-          double inv_norm;
-          // Calculate the normalized horizontal LOS vector
-          inv_norm = std::pow(square(out.velocity.x) + square(out.velocity.y), -0.5);
-          v_LOS_initial.x = out.velocity.x * inv_norm;
-          v_LOS_initial.y = out.velocity.y * inv_norm;
+          // Project the initial LOS vector onto the path
+          double projection_initial = dot(out.velocity, path_point.p_diff);
           // Perform obstacle avoidance
           step(own_x, own_y, obs, extra_avoidance_radius, path_point.p_diff.x, path_point.p_diff.y, out.velocity.x, out.velocity.y, task);
-          // Calculate the normalized LOS vector after obstacle avoidance
-          inv_norm = std::pow(square(out.velocity.x) + square(out.velocity.y), -0.5);
-          v_LOS_final.x = out.velocity.x * inv_norm;
-          v_LOS_final.y = out.velocity.y * inv_norm;
+          // Calculate the LOS vector projection after obstacle avoidance
+          double projection_final = dot(out.velocity, path_point.p_diff);
           // Adjust the path parameter update law
-          out.path_parameter_derivative *= dot(v_LOS_initial, v_LOS_final);
+          double progress_difference = out.path_progress * (projection_final / projection_initial - 1.);
+          out.path_progress += progress_difference;
+          out.path_parameter_derivative += progress_difference;
         }
     };    
 }
