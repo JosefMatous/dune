@@ -12,7 +12,7 @@ hosts = {'lauv-fridtjof': ('10.0.10.70', '6002'),
 
 dune_sendmsg = '../../build/dune-sendmsg'
 
-def send_start(vehicle, use_obstacle:bool=False, use_ellipse:bool=True):
+def send_start(vehicle, use_obstacle:bool=False, use_ellipse:bool=False):
     if use_obstacle:
         plan_name = 'plan-obstacle-'
     else:
@@ -27,8 +27,8 @@ def send_start(vehicle, use_obstacle:bool=False, use_ellipse:bool=True):
 if __name__ == '__main__':
     print('Enter vehicles separated by spaces:')
     vehicles = input().split(' ')
-    print('Use ellipse (Y/n)?')
-    use_ellipse = input().lower() != 'n'
+    print('Use ellipse (y/N)?')
+    use_ellipse = input().lower() == 'y'
     print('Use obstacle (y/N)?')
     use_obstacle = input().lower() == 'y'
 

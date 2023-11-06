@@ -6,17 +6,19 @@ from enum import Enum
 ## Parameters
 lat0 = np.deg2rad(63.435853) # origin latitude
 lon0 = np.deg2rad(10.357786) # origin longitude
-depth = 0.
+depth = 10.
 # Elliptical path
 a = 100. # semimajor axis
 b = 80. # semiminor axis
-c = 0. # depth oscillations
+c = 5. # depth oscillations
 # Waypoints
 wp_offset_x = 70.
 wp_offset_y = 0.
-wp_offset_z = 0.
+wp_offset_z = 5.
 wp_radius = 50.
 wp_length = 250.
+wp_depth = 8.
+wp_psi = 0. # orientation
 # Obstacle settings
 class ObstacleMode(Enum):
     NOTHING = 0
@@ -67,15 +69,23 @@ def set_formation_shape(vehicle_list):
                         'Formation Keeping -- Formation y', str(f[1]), 
                         'Formation Keeping -- Formation z', str(f[2])])
         
-def generate_waypoints():
-    x = '{}, {}, {}, {}'.format(wp_offset_x, wp_offset_x+wp_length, wp_offset_x+wp_length, wp_offset_x)
-    y = '{}, {}, {}, {}'.format(wp_offset_y, wp_offset_y, wp_offset_y+2*wp_radius, wp_offset_y+2*wp_radius)
-    z = '{}, {}, {}, {}'.format(wp_offset_z, wp_offset_z+c, wp_offset_z+c, wp_offset_z)
+def generate_waypoints(underwater:bool=False):
+    wp_x0 = np.array([0., wp_length, wp_length, 0.])
+    wp_y0 = np.array([0., 0., 2*wp_radius, 2*wp_radius])
+    wp_x = wp_offset_x + (np.cos(wp_psi)*wp_x0 - np.sin(wp_psi)*wp_y0)
+    wp_y = wp_offset_y + (np.cos(wp_psi)*wp_y0 + np.sin(wp_psi)*wp_x0)
+    if underwater:
+        wp_z = [wp_offset_z, wp_offset_z+c, wp_offset_z+c, wp_offset_z]
+    else:
+        wp_z = [0., 0., 0., 0.]
+    x = '{}, {}, {}, {}'.format(*wp_x)
+    y = '{}, {}, {}, {}'.format(*wp_y)
+    z = '{}, {}, {}, {}'.format(*wp_z)
 
     return x, y, z
 
-def set_path_parameters(vehicle_list):
-    wp_x, wp_y, wp_z = generate_waypoints()
+def set_path_parameters(vehicle_list, underwater:bool=False):
+    wp_x, wp_y, wp_z = generate_waypoints(underwater)
     for v in vehicle_list:
         set_parameters(v, 'NSB Parameters',
                         ['Ellipse -- Origin Latitude', str(lat0),
@@ -128,7 +138,7 @@ def set_obstacle(vehicle_list, mode:ObstacleMode=ObstacleMode.NOTHING):
                          'Obstacle -- Velocity x', v_x_obstacle,
                          'Obstacle -- Velocity y', v_y_obstacle]) 
 
-def set_nsb(vehicle_list, use_ellipse:bool=True):
+def set_nsb(vehicle_list, use_ellipse:bool=False):
     if use_ellipse:
         cmd = ['Experiment Stop Parameter', str(2*np.pi)]
     else:
@@ -136,7 +146,7 @@ def set_nsb(vehicle_list, use_ellipse:bool=True):
     for v in vehicle_list:
         set_parameters(v, 'Distributed NSB', cmd)
         
-def set_plan_generator(vehicle_list, use_obstacle:bool=False, use_ellipse:bool=True):
+def set_plan_generator(vehicle_list, use_obstacle:bool=False, use_ellipse:bool=False):
     initial_formation = initial_positions_ellipse if use_ellipse else initial_positions_wp
     barycenter = np.mean(initial_formation, 0)
     lat_b, lon_b, _ = wgs84.displace(barycenter[0], barycenter[1], barycenter[2], lat0, lon0, 0.)
@@ -167,14 +177,16 @@ def set_plan_generator(vehicle_list, use_obstacle:bool=False, use_ellipse:bool=T
 if __name__ == '__main__':
     print('Enter vehicles separated by spaces:')
     vehicles = input().split(' ')
-    print('Use ellipse (Y/n)?')
-    use_ellipse = input().lower() != 'n'
+    print('Use ellipse (y/N)?')
+    use_ellipse = input().lower() == 'y'
+    print('Underwater (y/N)?')
+    underwater = input().lower() == 'y'
     print('Enter obstacle mode (0=none, 1=ellipse, 2=cross, 3=head-on):')
     mode = ObstacleMode(int(input()))
     use_obstacle = (mode != ObstacleMode.NOTHING)
 
     set_formation_shape(vehicles)
-    set_path_parameters(vehicles)
+    set_path_parameters(vehicles, underwater)
     set_obstacle(vehicles, mode)
     set_plan_generator(vehicles, use_obstacle, use_ellipse)
     set_nsb(vehicles, use_ellipse)
