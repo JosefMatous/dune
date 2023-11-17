@@ -67,7 +67,7 @@ namespace NSB
 
         struct ObstacleInfo
         {
-          Vector2D relative_position, relative_velocity, obstacle_velocity;
+          Vector2D relative_position;
           double cone_angle;
           bool is_in_cone, hysteresis;
         };       
@@ -79,10 +79,9 @@ namespace NSB
           ObstacleInfo info;
           info.relative_position.x = obs.x - own_x;
           info.relative_position.y = obs.y - own_y;
-          info.relative_velocity.x = own_vx - obs.vx;
-          info.relative_velocity.y = own_vy - obs.vy;
-          info.obstacle_velocity.x = obs.vx;
-          info.obstacle_velocity.y = obs.vy;
+          Vector2D relative_velocity;
+          relative_velocity.x = own_vx - obs.vx;
+          relative_velocity.y = own_vy - obs.vy;
 
           double distance = norm(info.relative_position);
           float avoidance_radius = m_obstacle_radius + extra_avoidance_radius;
@@ -91,15 +90,15 @@ namespace NSB
           else
             info.cone_angle = M_PI_2 + m_recovery * (avoidance_radius - distance) / avoidance_radius;
 
-          double speed = norm(info.relative_velocity);
+          double speed = norm(relative_velocity);
 
           if (info.cone_angle >= m_cone_min)
-            info.is_in_cone = dot(info.relative_position, info.relative_velocity) >= std::cos(info.cone_angle) * speed * distance;
+            info.is_in_cone = dot(info.relative_position, relative_velocity) >= std::cos(info.cone_angle) * speed * distance;
           else
             info.is_in_cone = false;            
 
           if ((m_last_direction != OA_DIRECTION_NONE) && (m_hysteresis > 0.))
-            info.hysteresis = dot(info.relative_position, info.relative_velocity) >= std::cos(info.cone_angle + m_hysteresis) * speed * distance;
+            info.hysteresis = dot(info.relative_position, relative_velocity) >= std::cos(info.cone_angle + m_hysteresis) * speed * distance;
           else
             info.hysteresis = false;
 
@@ -134,13 +133,19 @@ namespace NSB
         }
 
         Vector2D
-        generateAvoidanceManeuver(ObstacleInfo& oinf, uint8_t direction)
+        generateAvoidanceManeuver(ObstacleInfo& oinf, uint8_t direction, double own_vx, double own_vy, const ObstacleState& obs)
         {
           Vector2D man;
           double desired_course = std::atan2(oinf.relative_position.y, oinf.relative_position.x) + getDirection(direction)*oinf.cone_angle;
-          double speed = norm(oinf.relative_velocity);
-          man.x = speed*std::cos(desired_course) + oinf.obstacle_velocity.x;
-          man.y = speed*std::sin(desired_course) + oinf.obstacle_velocity.y;
+          double own_speed = std::sqrt(square(own_vx) + square(own_vy));
+          // Solve for U such that
+          //   man = U*[cos(desired_course), sin(desired)course] + obstacle_velocity
+          //   norm(man) = speed
+          double a = 2 * (std::cos(desired_course)*obs.vx + std::sin(desired_course)*obs.vy);
+          double b = square(own_speed) - square(obs.vx) - square(obs.vy);
+          double U = (std::sqrt(square(a) + 4*b)) * 0.5;
+          man.x = U*std::cos(desired_course) + obs.vx;
+          man.y = U*std::sin(desired_course) + obs.vy;
 
           return man;
         }
@@ -201,7 +206,7 @@ namespace NSB
           Vector2D reference;
           if ((m_last_direction != OA_DIRECTION_NONE) && contains(active_obstacles, m_last_obstacle))
           {
-            reference = generateAvoidanceManeuver(active_obstacles[m_last_obstacle], m_last_direction);
+            reference = generateAvoidanceManeuver(active_obstacles[m_last_obstacle], m_last_direction, own_vx, own_vy, obs[m_last_obstacle]);
           }
           else
           {
@@ -232,9 +237,11 @@ namespace NSB
 
           // If not, minimize deviation
           m_last_obstacle = closest_obstacle;
-          Vector2D man_starboard = generateAvoidanceManeuver(active_obstacles[closest_obstacle], OA_DIRECTION_STARBOARD);
-          Vector2D man_port = generateAvoidanceManeuver(active_obstacles[closest_obstacle], OA_DIRECTION_PORT);
-          if (dot(man_starboard, reference) > dot(man_port, reference))
+          Vector2D man_starboard = generateAvoidanceManeuver(active_obstacles[closest_obstacle], OA_DIRECTION_STARBOARD, own_vx, own_vy, obs[closest_obstacle]);
+          Vector2D man_port = generateAvoidanceManeuver(active_obstacles[closest_obstacle], OA_DIRECTION_PORT, own_vx, own_vy, obs[closest_obstacle]);
+          double man_starboard_deviation = dot(man_starboard, reference) / (norm(man_starboard)*norm(reference));
+          double man_port_deviation = dot(man_port, reference) / (norm(man_port)*norm(reference));
+          if ((man_starboard_deviation + 0.1) > man_port_deviation) // slightly bias the maneuvers towards starboard side
           {
             own_vx = man_starboard.x;
             own_vy = man_starboard.y;
