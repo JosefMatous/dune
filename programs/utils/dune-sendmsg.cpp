@@ -149,6 +149,7 @@ main(int argc, char** argv)
       fprintf(stdout, "  [D]: DataSanity, DesiredControl, DesiredHeading, DesiredHeadingRate, DesiredPitch,\n");
       fprintf(stdout, "       DesiredSpeed, DesiredRoll, DesiredZ, DevCalibrationControl, DevDataText\n");
       fprintf(stdout, "  [E]: EmergencyControl, EntityList, EntityState, EntityActivationState, EstimatedState\n");
+      fprintf(stdout, "       ExperimentControl\n");
       fprintf(stdout, "  [F]: FuelLevel\n");
       fprintf(stdout, "  [G]: GpsFix, GpsFixRtk\n");
       fprintf(stdout, "  [H]: Heartbeat\n");
@@ -413,6 +414,17 @@ main(int argc, char** argv)
     tmsg->lat = 0.0;
     tmsg->lon = 0.0;
     tmsg->depth = 0.0;
+  }
+
+  if (strcmp(argv[3], "ExperimentControl") == 0)
+  {
+    IMC::ExperimentControl* tmsg = new IMC::ExperimentControl;
+    msg = tmsg;
+    tmsg->start = (uint8_t) atoi(argv[4]);
+    if (argc >= 6)
+      tmsg->delay = atof(argv[5]);
+    else
+      tmsg->delay = 0.0;
   }
 
   if (strcmp(argv[3], "FuelLevel") == 0)

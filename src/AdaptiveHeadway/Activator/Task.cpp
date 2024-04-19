@@ -1,5 +1,5 @@
 //***************************************************************************
-// Copyright 2007-2024 Universidade do Porto - Faculdade de Engenharia      *
+// Copyright 2007-2022 Universidade do Porto - Faculdade de Engenharia      *
 // Laboratório de Sistemas e Tecnologia Subaquática (LSTS)                  *
 //***************************************************************************
 // This file is part of DUNE: Unified Navigation Environment.               *
@@ -24,44 +24,71 @@
 // https://github.com/LSTS/dune/blob/master/LICENCE.md and                  *
 // http://ec.europa.eu/idabc/eupl.html.                                     *
 //***************************************************************************
-// Author: Ricardo Martins                                                  *
+// Author: Josef Matous                                                     *
 //***************************************************************************
-// Automatically generated.                                                 *
-//***************************************************************************
-// IMC XML MD5: a32a360803d2031b1914d47c361e742b                            *
-//***************************************************************************
-
-#ifndef DUNE_IMC_HEADER_HPP_INCLUDED_
-#define DUNE_IMC_HEADER_HPP_INCLUDED_
 
 // DUNE headers.
-#include <DUNE/Config.hpp>
+#include <DUNE/DUNE.hpp>
 
-namespace DUNE
+namespace AdaptiveHeadway
 {
-  namespace IMC
+  //! Activator
+  //!
+  //! Handles delayed activation via the ExperimentControl message.
+  //! @author Josef Matous
+  namespace Activator
   {
-    //! Header format.
-    struct Header
+    using DUNE_NAMESPACES;
+
+    struct Task: public DUNE::Tasks::Periodic
     {
-      //! Synchronization Number.
-      uint16_t sync;
-      //! Message Identification Number.
-      uint16_t mgid;
-      //! Message size.
-      uint16_t size;
-      //! Time stamp.
-      fp64_t timestamp;
-      //! Source Address.
-      uint16_t src;
-      //! Source Entity.
-      uint8_t src_ent;
-      //! Destination Address.
-      uint16_t dst;
-      //! Destination Entity.
-      uint8_t dst_ent;
-    };
+      IMC::ExperimentControl m_experiment_control;
+      bool m_is_waiting;
+      double m_transmission_time;
+
+      //! Constructor.
+      //! @param[in] name task name.
+      //! @param[in] ctx context.
+      Task(const std::string& name, Tasks::Context& ctx):
+        DUNE::Tasks::Periodic(name, ctx)
+      {
+        bind<IMC::ExperimentControl>(this);
+
+        m_is_waiting = false;
+        m_transmission_time = 0.;
+      }
+
+      void
+      consume(const IMC::ExperimentControl* msg)
+      {
+        if (msg->delay > 0.)
+        {
+          if (m_is_waiting)
+          {
+            war("An ExperimentControl message is already waiting. Ignoring ...");
+            return;
+          }
+          m_experiment_control.start = msg->start;
+          m_experiment_control.delay = 0.;
+          m_is_waiting = true;
+          m_transmission_time = Clock::get() + msg->delay;
+          debug("Waiting for %g seconds", msg->delay);
+        }
+      }
+
+      //! Main loop.
+      void
+      task(void)
+      {
+        if (m_is_waiting && (Clock::get() >= m_transmission_time))
+        {
+          dispatch(m_experiment_control);
+          m_is_waiting = false;
+          debug("Re-sending the ExperimentControl message");
+        }
+      }
+    };    
   }
 }
 
-#endif
+DUNE_TASK
