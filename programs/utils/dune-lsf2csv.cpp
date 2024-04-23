@@ -55,15 +55,24 @@ write_trajectory_reference_header(std::ofstream& out, bool standalone)
 {
   if (standalone)
     write_common_header(out);
-  out << "r_x (m), r_y (m), r_z (m), v_x (m/s), v_y (m/s), v_z (m/s), a_x (m/s^2), a_y (m/s^2), a_z (m/s^2)" << std::endl;
+  out << "r_x (m), r_y (m), r_z (m), r_v_x (m/s), r_v_y (m/s), r_v_z (m/s), r_a_x (m/s/s), r_a_y (m/s/s), r_a_z (m/s/s)" << std::endl;
 }
 
 inline void
-write_handposin_header(std::ofstream& out)
+write_handposin_header(std::ofstream& out, bool standalone)
 {
-  write_common_header(out);
+  if (standalone)
+    write_common_header(out);
   out << "type, u_x, u_y, u_z, ";
   write_trajectory_reference_header(out, false);
+}
+
+inline void
+write_handlog_header(std::ofstream& out)
+{
+  write_common_header(out);
+  out << "p_x (m), p_y (m), p_z (m), v_x (m/s), v_y (m/s), v_z (m/s), a_x (m/s/s), a_y (m/s/s), a_z (m/s/s), p_hat_x (m), p_hat_y (m), p_hat_z (m), v_hat_x (m/s), v_hat_y (m/s), v_hat_z (m/s), d_x, d_y, d_z, ";
+  write_handposin_header(out, false);
 }
 
 inline void
@@ -83,7 +92,13 @@ write_header(std::string message_name, std::ofstream& out)
 
   if (message_name == "HandPosIn")
   {
-    write_handposin_header(out);
+    write_handposin_header(out, true);
+    return;
+  }
+
+  if (message_name == "HandLog")
+  {
+    write_handlog_header(out);
     return;
   }
 
@@ -140,17 +155,18 @@ write_message(const DUNE::IMC::TrajectoryReference* msg, std::ofstream& out, boo
 }
 
 inline void
-write_message(const DUNE::IMC::HandPosIn* msg, std::ofstream& out)
+write_message(const DUNE::IMC::HandPosIn* msg, std::ofstream& out, bool standalone)
 {
-  write_timestamp_and_source(msg, out);
+  if (standalone)
+    write_timestamp_and_source(msg, out);
 
   switch (msg->type)
   {
-  case DUNE::IMC::HandPosIn::InputTypeBits::HAND_INPUT_VELOCITY:
+  case DUNE::IMC::INPUT_VELOCITY:
     out << "VELOCITY, ";
     break;
 
-  case DUNE::IMC::HandPosIn::InputTypeBits::HAND_INPUT_ACCELERATION:
+  case DUNE::IMC::INPUT_ACCELERATION:
     out << "ACCELERATION, ";
     break;
   
@@ -164,6 +180,22 @@ write_message(const DUNE::IMC::HandPosIn* msg, std::ofstream& out)
     out << "NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN" << std::endl;
   else
     write_message(msg->reference.get(), out, false);
+}
+
+inline void
+write_message(const DUNE::IMC::HandLog* msg, std::ofstream& out)
+{
+  write_timestamp_and_source(msg, out);
+  out << msg->p_x << ", " << msg->p_y << ", " << msg->p_z << ", " 
+    << msg->v_x << ", " << msg->v_y << ", " << msg->v_z << ", " 
+    << msg->a_x << ", " << msg->a_y << ", " << msg->a_z << ", " 
+    << msg->p_hat_x << ", " << msg->p_hat_y << ", " << msg->p_hat_z << ", " 
+    << msg->v_hat_x << ", " << msg->v_hat_y << ", " << msg->v_hat_z << ", " 
+    << msg->d_x << ", " << msg->d_y << ", " << msg->d_z << ", ";
+  if (msg->input.isNull())
+    out << "UNDEFINED, NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN, NaN" << std::endl;
+  else
+    write_message(msg->input.get(), out, false);
 }
 
 inline void
@@ -183,7 +215,13 @@ write_message(const DUNE::IMC::Message* msg, std::ofstream& out)
 
   if (msg->getId() == DUNE_IMC_HANDPOSIN)
   {
-    write_message((const IMC::HandPosIn*) msg, out);
+    write_message((const IMC::HandPosIn*) msg, out, true);
+    return;
+  }
+
+  if (msg->getId() == DUNE_IMC_HANDLOG)
+  {
+    write_message((const IMC::HandLog*) msg, out);
     return;
   }
 }
@@ -204,6 +242,11 @@ get_message_name(const DUNE::IMC::Message* msg)
   if (msg->getId() == DUNE_IMC_HANDPOSIN)
   {
     return "HandPosIn";
+  }
+
+  if (msg->getId() == DUNE_IMC_HANDLOG)
+  {
+    return "HandLog";
   }
 
   return "";

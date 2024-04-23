@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: a32a360803d2031b1914d47c361e742b                            *
+// IMC XML MD5: 1446314a18f505e57ec5c41ddde2addf                            *
 //***************************************************************************
 
 // ISO C++ 98 headers.
@@ -28420,6 +28420,216 @@ namespace DUNE
     {
       IMC::toJSON(os__, "start", start, nindent__);
       IMC::toJSON(os__, "delay", delay, nindent__);
+    }
+
+    HandLog::HandLog(void)
+    {
+      m_header.mgid = 2033;
+      clear();
+      input.setParent(this);
+    }
+
+    void
+    HandLog::clear(void)
+    {
+      input.clear();
+      p_x = 0;
+      p_y = 0;
+      p_z = 0;
+      v_x = 0;
+      v_y = 0;
+      v_z = 0;
+      a_x = 0;
+      a_y = 0;
+      a_z = 0;
+      p_hat_x = 0;
+      p_hat_y = 0;
+      p_hat_z = 0;
+      v_hat_x = 0;
+      v_hat_y = 0;
+      v_hat_z = 0;
+      d_x = 0;
+      d_y = 0;
+      d_z = 0;
+    }
+
+    bool
+    HandLog::fieldsEqual(const Message& msg__) const
+    {
+      const IMC::HandLog& other__ = static_cast<const HandLog&>(msg__);
+      if (input != other__.input) return false;
+      if (p_x != other__.p_x) return false;
+      if (p_y != other__.p_y) return false;
+      if (p_z != other__.p_z) return false;
+      if (v_x != other__.v_x) return false;
+      if (v_y != other__.v_y) return false;
+      if (v_z != other__.v_z) return false;
+      if (a_x != other__.a_x) return false;
+      if (a_y != other__.a_y) return false;
+      if (a_z != other__.a_z) return false;
+      if (p_hat_x != other__.p_hat_x) return false;
+      if (p_hat_y != other__.p_hat_y) return false;
+      if (p_hat_z != other__.p_hat_z) return false;
+      if (v_hat_x != other__.v_hat_x) return false;
+      if (v_hat_y != other__.v_hat_y) return false;
+      if (v_hat_z != other__.v_hat_z) return false;
+      if (d_x != other__.d_x) return false;
+      if (d_y != other__.d_y) return false;
+      if (d_z != other__.d_z) return false;
+      return true;
+    }
+
+    int
+    HandLog::validate(void) const
+    {
+      return true;
+    }
+
+    uint8_t*
+    HandLog::serializeFields(uint8_t* bfr__) const
+    {
+      uint8_t* ptr__ = bfr__;
+      ptr__ += input.serialize(ptr__);
+      ptr__ += IMC::serialize(p_x, ptr__);
+      ptr__ += IMC::serialize(p_y, ptr__);
+      ptr__ += IMC::serialize(p_z, ptr__);
+      ptr__ += IMC::serialize(v_x, ptr__);
+      ptr__ += IMC::serialize(v_y, ptr__);
+      ptr__ += IMC::serialize(v_z, ptr__);
+      ptr__ += IMC::serialize(a_x, ptr__);
+      ptr__ += IMC::serialize(a_y, ptr__);
+      ptr__ += IMC::serialize(a_z, ptr__);
+      ptr__ += IMC::serialize(p_hat_x, ptr__);
+      ptr__ += IMC::serialize(p_hat_y, ptr__);
+      ptr__ += IMC::serialize(p_hat_z, ptr__);
+      ptr__ += IMC::serialize(v_hat_x, ptr__);
+      ptr__ += IMC::serialize(v_hat_y, ptr__);
+      ptr__ += IMC::serialize(v_hat_z, ptr__);
+      ptr__ += IMC::serialize(d_x, ptr__);
+      ptr__ += IMC::serialize(d_y, ptr__);
+      ptr__ += IMC::serialize(d_z, ptr__);
+      return ptr__;
+    }
+
+    uint16_t
+    HandLog::deserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      const uint8_t* start__ = bfr__;
+      bfr__ += input.deserialize(bfr__, size__);
+      bfr__ += IMC::deserialize(p_x, bfr__, size__);
+      bfr__ += IMC::deserialize(p_y, bfr__, size__);
+      bfr__ += IMC::deserialize(p_z, bfr__, size__);
+      bfr__ += IMC::deserialize(v_x, bfr__, size__);
+      bfr__ += IMC::deserialize(v_y, bfr__, size__);
+      bfr__ += IMC::deserialize(v_z, bfr__, size__);
+      bfr__ += IMC::deserialize(a_x, bfr__, size__);
+      bfr__ += IMC::deserialize(a_y, bfr__, size__);
+      bfr__ += IMC::deserialize(a_z, bfr__, size__);
+      bfr__ += IMC::deserialize(p_hat_x, bfr__, size__);
+      bfr__ += IMC::deserialize(p_hat_y, bfr__, size__);
+      bfr__ += IMC::deserialize(p_hat_z, bfr__, size__);
+      bfr__ += IMC::deserialize(v_hat_x, bfr__, size__);
+      bfr__ += IMC::deserialize(v_hat_y, bfr__, size__);
+      bfr__ += IMC::deserialize(v_hat_z, bfr__, size__);
+      bfr__ += IMC::deserialize(d_x, bfr__, size__);
+      bfr__ += IMC::deserialize(d_y, bfr__, size__);
+      bfr__ += IMC::deserialize(d_z, bfr__, size__);
+      return bfr__ - start__;
+    }
+
+    uint16_t
+    HandLog::reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__)
+    {
+      const uint8_t* start__ = bfr__;
+      bfr__ += input.reverseDeserialize(bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(p_x, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(p_y, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(p_z, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(v_x, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(v_y, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(v_z, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(a_x, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(a_y, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(a_z, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(p_hat_x, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(p_hat_y, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(p_hat_z, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(v_hat_x, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(v_hat_y, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(v_hat_z, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(d_x, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(d_y, bfr__, size__);
+      bfr__ += IMC::reverseDeserialize(d_z, bfr__, size__);
+      return bfr__ - start__;
+    }
+
+    void
+    HandLog::fieldsToJSON(std::ostream& os__, unsigned nindent__) const
+    {
+      input.toJSON(os__, "input", nindent__);
+      IMC::toJSON(os__, "p_x", p_x, nindent__);
+      IMC::toJSON(os__, "p_y", p_y, nindent__);
+      IMC::toJSON(os__, "p_z", p_z, nindent__);
+      IMC::toJSON(os__, "v_x", v_x, nindent__);
+      IMC::toJSON(os__, "v_y", v_y, nindent__);
+      IMC::toJSON(os__, "v_z", v_z, nindent__);
+      IMC::toJSON(os__, "a_x", a_x, nindent__);
+      IMC::toJSON(os__, "a_y", a_y, nindent__);
+      IMC::toJSON(os__, "a_z", a_z, nindent__);
+      IMC::toJSON(os__, "p_hat_x", p_hat_x, nindent__);
+      IMC::toJSON(os__, "p_hat_y", p_hat_y, nindent__);
+      IMC::toJSON(os__, "p_hat_z", p_hat_z, nindent__);
+      IMC::toJSON(os__, "v_hat_x", v_hat_x, nindent__);
+      IMC::toJSON(os__, "v_hat_y", v_hat_y, nindent__);
+      IMC::toJSON(os__, "v_hat_z", v_hat_z, nindent__);
+      IMC::toJSON(os__, "d_x", d_x, nindent__);
+      IMC::toJSON(os__, "d_y", d_y, nindent__);
+      IMC::toJSON(os__, "d_z", d_z, nindent__);
+    }
+
+    void
+    HandLog::setTimeStampNested(double value__)
+    {
+      if (!input.isNull())
+      {
+        input.get()->setTimeStamp(value__);
+      }
+    }
+
+    void
+    HandLog::setSourceNested(uint16_t value__)
+    {
+      if (!input.isNull())
+      {
+        input.get()->setSource(value__);
+      }
+    }
+
+    void
+    HandLog::setSourceEntityNested(uint8_t value__)
+    {
+      if (!input.isNull())
+      {
+        input.get()->setSourceEntity(value__);
+      }
+    }
+
+    void
+    HandLog::setDestinationNested(uint16_t value__)
+    {
+      if (!input.isNull())
+      {
+        input.get()->setDestination(value__);
+      }
+    }
+
+    void
+    HandLog::setDestinationEntityNested(uint8_t value__)
+    {
+      if (!input.isNull())
+      {
+        input.get()->setDestinationEntity(value__);
+      }
     }
   }
 }

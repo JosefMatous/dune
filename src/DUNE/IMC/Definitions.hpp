@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: a32a360803d2031b1914d47c361e742b                            *
+// IMC XML MD5: 1446314a18f505e57ec5c41ddde2addf                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_DEFINITIONS_HPP_INCLUDED_
@@ -26723,15 +26723,6 @@ namespace DUNE
     {
     public:
       //! Input Type.
-      enum InputTypeBits
-      {
-        //! Velocity.
-        HAND_INPUT_VELOCITY = 0x01,
-        //! Acceleration.
-        HAND_INPUT_ACCELERATION = 0x02
-      };
-
-      //! Input Type.
       uint8_t type;
       //! Input x.
       fp64_t u_x;
@@ -26879,6 +26870,125 @@ namespace DUNE
 
       void
       fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+    };
+
+    //! Hand Controller Log.
+    class HandLog: public Message
+    {
+    public:
+      //! Input.
+      InlineMessage<HandPosIn> input;
+      //! Hand position x.
+      fp64_t p_x;
+      //! Hand position y.
+      fp64_t p_y;
+      //! Hand position z.
+      fp64_t p_z;
+      //! Hand velocity x.
+      fp64_t v_x;
+      //! Hand velocity y.
+      fp64_t v_y;
+      //! Hand velocity z.
+      fp64_t v_z;
+      //! Hand acceleartion x.
+      fp64_t a_x;
+      //! Hand acceleartion y.
+      fp64_t a_y;
+      //! Hand acceleartion z.
+      fp64_t a_z;
+      //! Estimated hand position x.
+      fp64_t p_hat_x;
+      //! Estimated hand position y.
+      fp64_t p_hat_y;
+      //! Estimated hand position z.
+      fp64_t p_hat_z;
+      //! Estimated hand velocity x.
+      fp64_t v_hat_x;
+      //! Estimated hand velocity y.
+      fp64_t v_hat_y;
+      //! Estimated hand velocity z.
+      fp64_t v_hat_z;
+      //! Disturbance x.
+      fp64_t d_x;
+      //! Disturbance y.
+      fp64_t d_y;
+      //! Disturbance z.
+      fp64_t d_z;
+
+      static uint16_t
+      getIdStatic(void)
+      {
+        return 2033;
+      }
+
+      HandLog(void);
+
+      HandLog*
+      clone(void) const
+      {
+        return new HandLog(*this);
+      }
+
+      void
+      clear(void);
+
+      bool
+      fieldsEqual(const Message& msg__) const;
+
+      int
+      validate(void) const;
+
+      uint8_t*
+      serializeFields(uint8_t* bfr__) const;
+
+      uint16_t
+      deserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      reverseDeserializeFields(const uint8_t* bfr__, uint16_t size__);
+
+      uint16_t
+      getId(void) const
+      {
+        return HandLog::getIdStatic();
+      }
+
+      const char*
+      getName(void) const
+      {
+        return "HandLog";
+      }
+
+      unsigned
+      getFixedSerializationSize(void) const
+      {
+        return 144;
+      }
+
+      unsigned
+      getVariableSerializationSize(void) const
+      {
+        return input.getSerializationSize();
+      }
+
+      void
+      fieldsToJSON(std::ostream& os__, unsigned nindent__) const;
+
+    protected:
+      void
+      setTimeStampNested(double value__);
+
+      void
+      setSourceNested(uint16_t value__);
+
+      void
+      setSourceEntityNested(uint8_t value__);
+
+      void
+      setDestinationNested(uint16_t value__);
+
+      void
+      setDestinationEntityNested(uint8_t value__);
     };
   }
 }

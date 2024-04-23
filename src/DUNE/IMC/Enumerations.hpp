@@ -28,7 +28,7 @@
 //***************************************************************************
 // Automatically generated.                                                 *
 //***************************************************************************
-// IMC XML MD5: a32a360803d2031b1914d47c361e742b                            *
+// IMC XML MD5: 1446314a18f505e57ec5c41ddde2addf                            *
 //***************************************************************************
 
 #ifndef DUNE_IMC_ENUMERATIONS_HPP_INCLUDED_
@@ -123,6 +123,15 @@ namespace DUNE
       UAVTYPE_COPTER = 1,
       //! Vtol.
       UAVTYPE_VTOL = 2
+    };
+
+    //! Input Type.
+    enum InputType
+    {
+      //! Velocity.
+      INPUT_VELOCITY = 0,
+      //! Acceleration.
+      INPUT_ACCELERATION = 1
     };
   }
 }
