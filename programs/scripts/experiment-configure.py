@@ -32,11 +32,11 @@ class FigureEightTrajectory(Trajectory):
             arg = self.k * t
             x = self.x0 + self.a * np.cos(arg)
             y = self.y0 + self.b * np.sin(2*arg)
-            z = self.z0 - self.c * np.cos(2*arg)
+            z = self.z0 + self.c * np.cos(2*arg)
 
             v_x = -self.a * self.k * np.sin(arg)
             v_y = 2*self.b * self.k * np.cos(2*arg)
-            v_z = 2*self.c * self.k * np.sin(2*arg)
+            v_z = -2*self.c * self.k * np.sin(2*arg)
             U = np.sqrt(v_x**2 + v_y**2 + v_z**2)
 
             points.append((x, y, z, U))
@@ -76,9 +76,10 @@ class Configurator(DynamicActor):
 
                 self.send(node, self.generate_plan())
 
-                param_trajectory, param_controller = self.generate_parameters()
-                self.send(node, param_trajectory)
-                self.send(node, param_controller)
+                params = self.generate_parameters()
+                for param in params:
+                    self.send(node, param)
+
             except KeyError:
                 pass
         if self.has_latlon() and self.ack:
@@ -137,7 +138,11 @@ class Configurator(DynamicActor):
         param_controller.name = 'Trajectory Controller'
         Configurator.add_params(param_controller.params, {'Minimum Hand Length':str(self.e0), 'Headway Gain':str(self.k_e)})
 
-        return (param_trajectory, param_controller)
+        param_pathctrl = imcpy.SetEntityParameters()
+        param_pathctrl.name = 'Path Controller'
+        Configurator.add_params(param_pathctrl.params, {'Minimum Hand Length':str(self.e0), 'Headway Gain':str(self.k_e)})
+
+        return (param_trajectory, param_controller, param_pathctrl)
 
     @staticmethod
     def add_params(paramlist:imcpy.MessageListEntityParameter, namevaldict:dict):

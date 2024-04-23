@@ -36,14 +36,14 @@ namespace AdaptiveHeadway
 
   //! Generate rotation matrix in a column-major format
   inline void
-  rotation_matrix(float* R, const EstimatedState &est)
+  rotation_matrix(float* R, float phi, float theta, float psi)
   {
-    float c_phi = std::cos(est.phi);
-    float s_phi = std::sin(est.phi);
-    float c_theta = std::cos(est.theta);
-    float s_theta = std::sin(est.theta);
-    float c_psi = std::cos(est.psi);
-    float s_psi = std::sin(est.psi);
+    float c_phi = std::cos(phi);
+    float s_phi = std::sin(phi);
+    float c_theta = std::cos(theta);
+    float s_theta = std::sin(theta);
+    float c_psi = std::cos(psi);
+    float s_psi = std::sin(psi);
 
     R[0] = c_psi*c_theta;
     R[1] = c_theta*s_psi;
@@ -54,6 +54,12 @@ namespace AdaptiveHeadway
     R[6] = s_phi*s_psi + c_phi*c_psi*s_theta;
     R[7] = c_phi*s_psi*s_theta - c_psi*s_phi;
     R[8] = c_phi*c_theta;
+  }
+
+  inline void
+  rotation_matrix(float* R, const EstimatedState &est)
+  {
+    rotation_matrix(R, est.phi, est.theta, est.psi);
   }
 
   //! Calculates the direction vector of the vehicle (R*[1;0;0])

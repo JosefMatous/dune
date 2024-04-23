@@ -53,7 +53,7 @@ namespace AdaptiveHeadway
       double m_T_start, m_T_stop;
       IMC::ExperimentControl m_stop_experiment;
 
-      double k_p, e0, k_e;
+      double k_p_horz, k_p_vert, e0, k_e;
 
       //! Constructor.
       //! @param[in] name task name.
@@ -67,15 +67,19 @@ namespace AdaptiveHeadway
 
         m_stop_experiment.start = IMC::BOOL_FALSE;
         m_stop_experiment.delay = 0.;
-        m_control_input.type = IMC::HandPosIn::HAND_INPUT_VELOCITY;
+        m_control_input.type = IMC::INPUT_VELOCITY;
 
         param("Experiment Stop Time", m_T_stop)
           .defaultValue("400.")
           .description("The task is stopped after the given time. Enter negative value to ignore this.");
 
-        param("Proportional Gain", k_p)
+        param("Proportional Gain -- Horizontal", k_p_horz)
         .minimumValue("0.0")
         .defaultValue("0.1");
+
+        param("Proportional Gain -- Vertical", k_p_vert)
+        .minimumValue("0.0")
+        .defaultValue("0.25");
 
         param("Minimum Hand Length", e0)
         .units(Units::Meter)
@@ -148,9 +152,9 @@ namespace AdaptiveHeadway
           x_hand.z = msg->depth + gamma.z*e;
 
           // Trajectory control
-          m_control_input.u_x = k_p * (m_ref->r_x - x_hand.x) + m_ref->v_x;
-          m_control_input.u_y = k_p * (m_ref->r_y - x_hand.y) + m_ref->v_y;
-          m_control_input.u_z = k_p * (m_ref->r_z - x_hand.z) + m_ref->v_z;
+          m_control_input.u_x = k_p_horz * (m_ref->r_x - x_hand.x) + m_ref->v_x;
+          m_control_input.u_y = k_p_horz * (m_ref->r_y - x_hand.y) + m_ref->v_y;
+          m_control_input.u_z = k_p_vert * (m_ref->r_z - x_hand.z) + m_ref->v_z;
           spew("Control input: %.2f, %.2f, %.2f", m_control_input.u_x, m_control_input.u_y, m_control_input.u_z);
           dispatch(m_control_input);
 
