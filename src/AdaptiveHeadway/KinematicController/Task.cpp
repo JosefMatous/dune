@@ -40,9 +40,7 @@ namespace AdaptiveHeadway
   {
     struct Arguments
     {
-      double e0, k_e, k_pitch, pitch_offset, max_pitch, l1, l2;
-      //! Number of integration steps in the disturbance observer
-      int N_steps;
+      double e0, k_e, k_pitch, pitch_offset, max_pitch, wn;
       double k_ff_horz, k_ff_vert;
       double min_speed, max_speed;
     };
@@ -74,9 +72,7 @@ namespace AdaptiveHeadway
         //! Disturbance estimate
         Vector3D<double> d_hat;
       };
-      ObserverState m_last_state;
-      Vector3D<double> m_last_x_hand, m_last_v_hand;
-      Vector3D<float> m_last_angles, m_last_omega;
+      ObserverState m_observer_state;
       bool m_observer_initialized;
 
       //! Timer
@@ -119,17 +115,9 @@ namespace AdaptiveHeadway
         .units(Units::MeterPerSecond)
         .defaultValue("3.0");
 
-        param("Disturbance Observer Proportional Gain", m_args.l1)
+        param("Disturbance Observer Bandwidth", m_args.wn)
         .minimumValue("0.0")
-        .defaultValue("10.0");
-
-        param("Disturbance Observer Derivative Gain", m_args.l2)
-        .minimumValue("0.0")
-        .defaultValue("25.0");
-
-        param("Disturbance Observer Integrator Steps", m_args.N_steps)
-        .minimumValue("1")
-        .defaultValue("4");
+        .defaultValue("5.0");
 
         param("Feedforward Gain -- Horizontal", m_args.k_ff_horz)
         .minimumValue("0.0")
@@ -240,7 +228,8 @@ namespace AdaptiveHeadway
           x_err.z = state.depth - ts.end.z;
           spew("Waypoint control");
         }
-        double e = std::sqrt(m_args.e0*m_args.e0 + m_args.k_e*m_args.k_e*dot(x_err, x_err)); // hand length
+        double k_e2 = std::pow(m_args.k_e, 2.0); // k_e^2
+        double e = std::sqrt(std::pow(m_args.e0, 2.0) + k_e2*dot(x_err, x_err)); // hand length
 
         x_hand.x = state.x + gamma.x*e;
         x_hand.y = state.y + gamma.y*e;
@@ -289,7 +278,7 @@ namespace AdaptiveHeadway
         omega_e1.z = -state.q;
         timesR(gamma_dot, R, omega_e1); // gamma_dot = R * (omega x [1;0;0])
 
-        double e_dot = m_args.k_e*m_args.k_e*dot(x_err_dot, x_err) / e;
+        double e_dot = k_e2*dot(x_err_dot, x_err) / e;
 
         v_hand.x = state.vx + gamma_dot.x*e + gamma.x*e_dot;
         v_hand.y = state.vy + gamma_dot.y*e + gamma.y*e_dot;
@@ -307,34 +296,24 @@ namespace AdaptiveHeadway
         if (!m_observer_initialized)
         {
           // Initialize
-          m_last_state.x_hat.x = x_hand.x;
-          m_last_state.x_hat.y = x_hand.y;
-          m_last_state.x_hat.z = x_hand.z;
-
-          m_last_state.d_hat.x = 0.;
-          m_last_state.d_hat.y = 0.;
-          m_last_state.d_hat.z = 0.;
-
-          m_observer_initialized = true;
-
-          m_delta_t.reset();
+          initialize_observer(x_hand);
         }
         else
         {
-          disturbance_observer_rk4(m_last_state, m_delta_t.getDelta(), m_args.N_steps, state, x_hand, v_hand);
+          disturbance_observer_zoh(state, x_hand, v_hand, R);
         }
 
-        m_log.p_hat_x = m_last_state.x_hat.x;
-        m_log.p_hat_y = m_last_state.x_hat.y;
-        m_log.p_hat_z = m_last_state.x_hat.z;
-        m_log.d_x = m_last_state.d_hat.x;
-        m_log.d_y = m_last_state.d_hat.y;
-        m_log.d_z = m_last_state.d_hat.z;
+        m_log.p_hat_x = m_observer_state.x_hat.x;
+        m_log.p_hat_y = m_observer_state.x_hat.y;
+        m_log.p_hat_z = m_observer_state.x_hat.z;
+        m_log.d_x = m_observer_state.d_hat.x;
+        m_log.d_y = m_observer_state.d_hat.y;
+        m_log.d_z = m_observer_state.d_hat.z;
 
         // Disturbance compensation
-        //v_ref.x -= m_last_state.d_hat.x; 
-        //v_ref.y -= m_last_state.d_hat.y;
-        //v_ref.z -= m_last_state.d_hat.z;
+        v_ref.x -= m_observer_state.d_hat.x; 
+        v_ref.y -= m_observer_state.d_hat.y;
+        v_ref.z -= m_observer_state.d_hat.z;
 
         // Feedforward
         if (use_input)
@@ -358,9 +337,9 @@ namespace AdaptiveHeadway
         Rv_lat.x -= v_traj.x;
         Rv_lat.y -= v_traj.y;
         Rv_lat.z -= v_traj.z; // Rv_lat - v_traj
-        control_input.x -= m_args.k_e*m_args.k_e * dot(Rv_lat, x_err) / e; // -(k_e^2*dot(Rv_lat - v_traj, x_err)/e)*[1;0;0]
+        control_input.x -= k_e2 * dot(Rv_lat, x_err) / e; // -(k_e^2*dot(Rv_lat - v_traj, x_err)/e)*[1;0;0]
 
-        m_speed.value = control_input.x / (1.0 + m_args.k_e*m_args.k_e * dot(x_err, gamma) / e);
+        m_speed.value = control_input.x / (1.0 + k_e2 * dot(x_err, gamma) / e);
         trimValueMod(m_speed.value, m_args.min_speed, m_args.max_speed);
         m_hrate.value = control_input.y / e;
         m_pitch.value = Angles::radians(m_args.pitch_offset) - m_args.k_pitch * std::asin(control_input.z / norm(control_input));
@@ -371,104 +350,78 @@ namespace AdaptiveHeadway
         dispatch(m_pitch);
 
         dispatch(m_log);
-
-        m_last_x_hand = x_hand;
-        m_last_v_hand = v_hand;
-        m_last_omega.x = state.p;
-        m_last_omega.y = state.q;
-        m_last_omega.z = state.r;
-        m_last_angles.x = state.phi;
-        m_last_angles.y = state.theta;
-        m_last_angles.z = state.psi;
       }
 
       /* Disturbance observer */
-      inline float
-      interpolate_angle(float a1, float a2, double t_rel)
+      inline void
+      initialize_observer(const Vector3D<double>& x_hand)
       {
-        float delta_a = Angles::normalizeRadian(a2 - a1);
-        return Angles::normalizeRadian(a1 + t_rel*delta_a);
+        m_observer_state.x_hat = x_hand;
+        m_observer_state.d_hat.x = 0.0;
+        m_observer_state.d_hat.y = 0.0;
+        m_observer_state.d_hat.z = 0.0;
+
+        m_observer_initialized = true;
+
+        m_delta_t.reset();
       }
 
       void
-      disturbance_observer_ode(ObserverState& output, double t_rel, const ObserverState& observer_state, const IMC::EstimatedState& vehicle_state, const Vector3D<double>& x_hand_current, const Vector3D<double>& v_hand_current)
+      disturbance_observer_zoh(const IMC::EstimatedState& vehicle_state, const Vector3D<double>& x_hand, const Vector3D<double>& v_hand, const float* R)
       {
-        float phi = interpolate_angle(m_last_angles.x, vehicle_state.phi, t_rel);
-        float theta = interpolate_angle(m_last_angles.y, vehicle_state.theta, t_rel);
-        float psi = interpolate_angle(m_last_angles.z, vehicle_state.psi, t_rel);
-        float R[9];
-        rotation_matrix(R, phi, theta, psi);
-        Vector3D<double> x_hand_err;
-        double t_rel_i = 1.0 - t_rel;
-        x_hand_err.x = t_rel_i*m_last_x_hand.x + t_rel*x_hand_current.x - observer_state.x_hat.x;
-        x_hand_err.y = t_rel_i*m_last_x_hand.y + t_rel*x_hand_current.y - observer_state.x_hat.y;
-        x_hand_err.z = t_rel_i*m_last_x_hand.z + t_rel*x_hand_current.z - observer_state.x_hat.z;
+        //***************************************************************************
+        // Disturbance observer ODE:
+        //   (d/dt) x_hat = v_hand + d_hat + l1*(x_hand - x_hat),
+        //   (d/dt) d_hat = cross(R*[p;q;r], d_hat) + l2*(x_hand - x_hat),
+        // where
+        //   l1 = 2*m_args.wn, l2 = m_args.wn^2
+        //
+        // In matrix-vector form:
+        //   (d/dt) [x_hat; d_hat] = A*[x_hat; d_hat] + B*[x_hand; v_hand],
+        // where
+        //   A = [-l1*I, I; -l2*I, skew(R*[p;q;r])]
+        //   B = [-l1*I, I; -l2*I, 0]
+        //
+        // We perform ZOH discretization, but because the exact matrix exponential
+        // of A (and its integral) is impossible to find analytically, we use an
+        // approximation. The transition matrix of the discretized system is 
+        // calculated as:
+        //   A_d = A_d1 + [0, 0; 0, skew(R*[p;q;r])*Ts],
+        //   B_d = int_0^Ts expm([-l1*I, I; -l2*I, 0] * t) * B dt,
+        // where 
+        //   A_d1 = expm([-l1*I, I; -l2*I, 0] * Ts),
+        // and Ts is the sampling time.
+        
+        // Transition matrix coefficients
+        double Ts = m_delta_t.getDelta();
+        double wn_d = Ts*m_args.wn;
+        double e = std::exp(-wn_d);
+        // A_d1 = [1-Ts*wn, Ts; -Ts*wn^2, Ts*wn+1] * exp(-Ts*wn)
+        double a_11 = (1.0 - wn_d) * e;
+        double a_12 = Ts * e;
+        double a_21 = -a_12 * std::pow(m_args.wn, 2.0);
+        double a_22 = (1.0 + wn_d) * e;
+        // B_d = [Ts*wn*exp(-Ts*wn) - exp(-Ts*wn) + 1, Ts*exp(-Ts*wn); Ts*wn^2*exp(-Ts*wn), exp(-Ts*wn) + Ts*wn*exp(-Ts*wn) - 1]
+        double b_11 = 1.0 - a_11;
+        //double b_12 = a_12;
+        //double b_21 = -a_21;
+        double b_22 = a_22 - 1.0;
 
-        // Position estimate ODE: (d/dt)x_hat = v_hand + d_hat + l1*(x_hand - x_hat)
-        output.x_hat.x = t_rel_i*m_last_v_hand.x + t_rel*v_hand_current.x + observer_state.d_hat.x + m_args.l1*x_hand_err.x;
-        output.x_hat.y = t_rel_i*m_last_v_hand.y + t_rel*v_hand_current.y + observer_state.d_hat.y + m_args.l1*x_hand_err.y;
-        output.x_hat.z = t_rel_i*m_last_v_hand.z + t_rel*v_hand_current.z + observer_state.d_hat.z + m_args.l1*x_hand_err.z;
+        // First, we calculate A_d1*[x_hat; d_hat] + B_d*[x_hand; v_hand]
+        Vector3D<double> x_hat_new = a_11*m_observer_state.x_hat + a_12*(m_observer_state.d_hat + v_hand) + b_11*x_hand;
+        Vector3D<double> d_hat_new = a_21*(m_observer_state.x_hat - x_hand) + a_22*m_observer_state.d_hat + b_22*v_hand;
 
-        // Disturbance estimate ODE: (d/dt)d_hat = cross(R*omega, d_hat) + l2*(x_hand - x_hat)
-        Vector3D<double> omega, Romega;
-        omega.x = t_rel_i*m_last_omega.x + t_rel*vehicle_state.p;
-        omega.y = t_rel_i*m_last_omega.y + t_rel*vehicle_state.q;
-        omega.z = t_rel_i*m_last_omega.z + t_rel*vehicle_state.r;
-        timesR(Romega, R, omega);
-
-        cross(output.d_hat, Romega, observer_state.d_hat);
-        output.d_hat.x += m_args.l2*x_hand_err.x;
-        output.d_hat.y += m_args.l2*x_hand_err.y;
-        output.d_hat.z += m_args.l2*x_hand_err.z;
-      }
-
-      void
-      disturbance_observer_rk4(ObserverState& observer_state, double Ts, int N_steps, const IMC::EstimatedState& vehicle_state, const Vector3D<double>& x_hand_current, const Vector3D<double>& v_hand_current)
-      {
-        double delta_t_rel = 1.0 / N_steps;
-        double h = Ts / N_steps;
-        double h2 = 0.5 * h;
-        double h3 = 0.33333333333333333333333333333333333333333333333333333 * h;
-        double h6 = 0.16666666666666666666666666666666666666666666666666667 * h;
-
-        ObserverState k1, k2, k3, k4, y1, y2, y3;
-        for (int i = 0; i < N_steps; i++)
-        {
-          // k1 = f(t, x)
-          disturbance_observer_ode(k1, delta_t_rel*i, observer_state, vehicle_state, x_hand_current, v_hand_current);
-          // k2 = f(t+h/2, x + h/2*k1)
-          y1.x_hat.x = observer_state.x_hat.x + h2*k1.x_hat.x;
-          y1.x_hat.y = observer_state.x_hat.y + h2*k1.x_hat.y;
-          y1.x_hat.z = observer_state.x_hat.z + h2*k1.x_hat.z;
-          y1.d_hat.x = observer_state.d_hat.x + h2*k1.d_hat.x;
-          y1.d_hat.y = observer_state.d_hat.y + h2*k1.d_hat.y;
-          y1.d_hat.z = observer_state.d_hat.z + h2*k1.d_hat.z;
-          disturbance_observer_ode(k2, delta_t_rel*(0.5 + i), y1, vehicle_state, x_hand_current, v_hand_current);
-          // k3 = f(t+h/2, x + h/2*k2)
-          y2.x_hat.x = observer_state.x_hat.x + h2*k2.x_hat.x;
-          y2.x_hat.y = observer_state.x_hat.y + h2*k2.x_hat.y;
-          y2.x_hat.z = observer_state.x_hat.z + h2*k2.x_hat.z;
-          y2.d_hat.x = observer_state.d_hat.x + h2*k2.d_hat.x;
-          y2.d_hat.y = observer_state.d_hat.y + h2*k2.d_hat.y;
-          y2.d_hat.z = observer_state.d_hat.z + h2*k2.d_hat.z;
-          disturbance_observer_ode(k3, delta_t_rel*(0.5 + i), y2, vehicle_state, x_hand_current, v_hand_current);
-          // k4 = f(t+h, x + h*k3)
-          y3.x_hat.x = observer_state.x_hat.x + h*k3.x_hat.x;
-          y3.x_hat.y = observer_state.x_hat.y + h*k3.x_hat.y;
-          y3.x_hat.z = observer_state.x_hat.z + h*k3.x_hat.z;
-          y3.d_hat.x = observer_state.d_hat.x + h*k3.d_hat.x;
-          y3.d_hat.y = observer_state.d_hat.y + h*k3.d_hat.y;
-          y3.d_hat.z = observer_state.d_hat.z + h*k3.d_hat.z;
-          disturbance_observer_ode(k4, delta_t_rel*(1 + i), y3, vehicle_state, x_hand_current, v_hand_current);
-
-          // x += h/6 * (k1 + 2*k2 + 2*k3 + k4)
-          observer_state.x_hat.x += h6*k1.x_hat.x + h3*k2.x_hat.x + h6*k4.x_hat.x;
-          observer_state.x_hat.y += h6*k1.x_hat.y + h3*k2.x_hat.y + h6*k4.x_hat.y;
-          observer_state.x_hat.z += h6*k1.x_hat.z + h3*k2.x_hat.z + h6*k4.x_hat.z;
-          observer_state.d_hat.x += h6*k1.d_hat.x + h3*k2.d_hat.x + h6*k4.d_hat.x;
-          observer_state.d_hat.y += h6*k1.d_hat.y + h3*k2.d_hat.y + h6*k4.d_hat.y;
-          observer_state.d_hat.z += h6*k1.d_hat.z + h3*k2.d_hat.z + h6*k4.d_hat.z;
-        } 
+        // Next, we perform `d_hat += Ts*skew(R*[p;q;r])*d_hat`, which is equivalent to `d_hat += cross(R * [p; q; r] * Ts, d_hat)`
+        Vector3D<double> tmp, R_omega;
+        tmp.x = vehicle_state.p * Ts; // tmp = [p; q; r] * Ts
+        tmp.y = vehicle_state.q * Ts;
+        tmp.z = vehicle_state.r * Ts;
+        timesR(R_omega, R, tmp); // R_omega = R * [p; q; r] * Ts
+        cross(tmp, R_omega, m_observer_state.d_hat); // tmp = cross(R * [p; q; r] * Ts, d_hat)
+        d_hat_new += tmp;
+        
+        m_observer_state.x_hat = x_hat_new;
+        m_observer_state.d_hat = d_hat_new;
       }
     };
   }

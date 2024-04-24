@@ -11,7 +11,66 @@ namespace AdaptiveHeadway
   struct Vector3D
   {
     T x, y, z;
+
+    Vector3D<T>&
+    operator+=(const Vector3D<T> &a)
+    {
+      this->x += a.x;
+      this->y += a.y;
+      this->z += a.z;
+
+      return *this;
+    }
+
+    Vector3D<T>&
+    operator*=(T a)
+    {
+      this->x *= a;
+      this->y *= a;
+      this->z *= a;
+
+      return *this;
+    }
   };
+
+    template<typename T>
+    Vector3D<T>
+    operator+(const Vector3D<T> &a, const Vector3D<T> &b)
+    {
+      Vector3D<T> result;
+
+      result.x = a.x + b.x;
+      result.y = a.y + b.y;
+      result.z = a.z + b.z;
+
+      return result;
+    }
+
+    template<typename T>
+    Vector3D<T>
+    operator-(const Vector3D<T> &a, const Vector3D<T> &b)
+    {
+      Vector3D<T> result;
+
+      result.x = a.x - b.x;
+      result.y = a.y - b.y;
+      result.z = a.z - b.z;
+
+      return result;
+    }
+
+    template<typename T>
+    Vector3D<T>
+    operator*(T a, const Vector3D<T> &x)
+    {
+      Vector3D<T> result;
+
+      result.x = a * x.x;
+      result.y = a * x.y;
+      result.z = a * x.z;
+
+      return result;
+    }
   
   template<typename A, typename B>
   A dot(const Vector3D<A> &a, const Vector3D<B> &b)
