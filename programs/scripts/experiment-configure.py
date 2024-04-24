@@ -10,6 +10,9 @@ class Trajectory:
     def get_points(self):
         return [(0.,0.,0.,0.)]
     
+    def get_stoptime(self):
+        return 0.
+    
     # Returns the parameters of the trajectory as a dictionary
     def get_paramdict(self):
         return {}
@@ -26,10 +29,8 @@ class FigureEightTrajectory(Trajectory):
 
     def get_points(self):
         points = []
-        t_step = 0.25*np.pi / self.k
-        t_stop = 2.5*np.pi / self.k
-        for t in np.arange(0, t_stop, t_step):
-            arg = self.k * t
+        for i in range(9):
+            arg = (i+1) * np.pi / 4
             x = self.x0 + self.a * np.cos(arg)
             y = self.y0 + self.b * np.sin(2*arg)
             z = self.z0 + self.c * np.cos(2*arg)
@@ -41,6 +42,10 @@ class FigureEightTrajectory(Trajectory):
 
             points.append((x, y, z, U))
         return points
+    
+    def get_stoptime(self):
+        T_stop = 2*np.pi / self.k
+        return T_stop
     
     def get_paramdict(self):
         return {
@@ -136,7 +141,7 @@ class Configurator(DynamicActor):
 
         param_controller = imcpy.SetEntityParameters()
         param_controller.name = 'Trajectory Controller'
-        Configurator.add_params(param_controller.params, {'Minimum Hand Length':str(self.e0), 'Headway Gain':str(self.k_e)})
+        Configurator.add_params(param_controller.params, {'Minimum Hand Length':str(self.e0), 'Headway Gain':str(self.k_e), 'Experiment Stop Time':str(self.trajectory.get_stoptime())})
 
         param_pathctrl = imcpy.SetEntityParameters()
         param_pathctrl.name = 'Path Controller'
@@ -175,11 +180,11 @@ class Configurator(DynamicActor):
 
 x0_default = 0.0
 y0_default = 0.0
-z0_default = 7.5
-a_default = 70.0
-b_default = 35.0
-c_default = 5.0
-k_default = np.pi / 200
+z0_default = 15.0
+a_default = 80.0
+b_default = 40.0
+c_default = 10.0
+k_default = np.pi / 250
 
 e0_default = 1.0
 k_e_default = 0.5
