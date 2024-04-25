@@ -76,6 +76,20 @@ write_handlog_header(std::ofstream& out)
 }
 
 inline void
+write_rpm_header(std::ofstream& out)
+{
+  write_common_header(out);
+  out << "value";
+}
+
+inline void
+write_servoposition_header(std::ofstream& out)
+{
+  write_common_header(out);
+  out << "id, value (rad)";
+}
+
+inline void
 write_header(std::string message_name, std::ofstream& out)
 {
   if (message_name == "EstimatedState")
@@ -99,6 +113,18 @@ write_header(std::string message_name, std::ofstream& out)
   if (message_name == "HandLog")
   {
     write_handlog_header(out);
+    return;
+  }
+
+  if (message_name == "Rpm")
+  {
+    write_rpm_header(out);
+    return;
+  }
+
+  if (message_name == "ServoPosition")
+  {
+    write_servoposition_header(out);
     return;
   }
 
@@ -199,6 +225,20 @@ write_message(const DUNE::IMC::HandLog* msg, std::ofstream& out)
 }
 
 inline void
+write_message(const DUNE::IMC::Rpm* msg, std::ofstream& out)
+{
+  write_timestamp_and_source(msg, out);
+  out << msg->value << std::endl;
+}
+
+inline void
+write_message(const DUNE::IMC::ServoPosition* msg, std::ofstream& out)
+{
+  write_timestamp_and_source(msg, out);
+  out << msg->id << ", " << msg->value << std::endl;
+}
+
+inline void
 write_message(const DUNE::IMC::Message* msg, std::ofstream& out)
 {
   if (msg->getId() == DUNE_IMC_ESTIMATEDSTATE)
@@ -224,6 +264,18 @@ write_message(const DUNE::IMC::Message* msg, std::ofstream& out)
     write_message((const IMC::HandLog*) msg, out);
     return;
   }
+
+  if (msg->getId() == DUNE_IMC_RPM)
+  {
+    write_message((const IMC::Rpm*) msg, out);
+    return;
+  }
+
+  if (msg->getId() == DUNE_IMC_SERVOPOSITION)
+  {
+    write_message((const IMC::ServoPosition*) msg, out);
+    return;
+  }
 }
 
 const char*
@@ -247,6 +299,16 @@ get_message_name(const DUNE::IMC::Message* msg)
   if (msg->getId() == DUNE_IMC_HANDLOG)
   {
     return "HandLog";
+  }
+
+  if (msg->getId() == DUNE_IMC_RPM)
+  {
+    return "Rpm";
+  }
+
+if (msg->getId() == DUNE_IMC_SERVOPOSITION)
+  {
+    return "ServoPosition";
   }
 
   return "";
