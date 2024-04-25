@@ -29,8 +29,8 @@ class FigureEightTrajectory(Trajectory):
 
     def get_points(self):
         points = []
-        for i in range(9):
-            arg = (i+1) * np.pi / 4
+        for i in range(10):
+            arg = i * np.pi / 4
             x = self.x0 + self.a * np.cos(arg)
             y = self.y0 + self.b * np.sin(2*arg)
             z = self.z0 + self.c * np.cos(2*arg)
@@ -178,12 +178,12 @@ class Configurator(DynamicActor):
             if msg.type == imcpy.PlanControl.TypeEnum.SUCCESS and msg.plan_id == self.plan_name:
                 self.ack = True
 
-x0_default = 0.0
+x0_default = -30.0
 y0_default = 0.0
-z0_default = 15.0
-a_default = 80.0
-b_default = 40.0
-c_default = 10.0
+z0_default = 10.0
+a_default = 85.0
+b_default = 35.0
+c_default = 5.0
 k_default = np.pi / 250
 
 e0_default = 1.0
