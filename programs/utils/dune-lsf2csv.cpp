@@ -235,7 +235,7 @@ inline void
 write_message(const DUNE::IMC::ServoPosition* msg, std::ofstream& out)
 {
   write_timestamp_and_source(msg, out);
-  out << msg->id << ", " << msg->value << std::endl;
+  out << (int)msg->id << ", " << msg->value << std::endl;
 }
 
 inline void
