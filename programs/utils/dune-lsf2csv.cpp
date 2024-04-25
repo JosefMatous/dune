@@ -79,14 +79,14 @@ inline void
 write_rpm_header(std::ofstream& out)
 {
   write_common_header(out);
-  out << "value";
+  out << "value" << std::endl;
 }
 
 inline void
 write_servoposition_header(std::ofstream& out)
 {
   write_common_header(out);
-  out << "id, value (rad)";
+  out << "id, value (rad)" << std::endl;
 }
 
 inline void
