@@ -145,7 +145,7 @@ namespace AdaptiveHeadway
           x_err.x = msg->x - m_ref->r_x;
           x_err.y = msg->y - m_ref->r_y;
           x_err.z = msg->depth - m_ref->r_z;
-          double e = std::sqrt(e0*e0 + k_e*k_e*dot(x_err, x_err)); // hand length
+          double e = std::sqrt(std::pow(e0, 2.0) + std::pow(k_e, 2.0)*dot(x_err, x_err)); // hand length
           
           x_hand.x = msg->x + gamma.x*e;
           x_hand.y = msg->y + gamma.y*e;

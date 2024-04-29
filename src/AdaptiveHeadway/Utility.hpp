@@ -23,6 +23,16 @@ namespace AdaptiveHeadway
     }
 
     Vector3D<T>&
+    operator-=(const Vector3D<T> &a)
+    {
+      this->x -= a.x;
+      this->y -= a.y;
+      this->z -= a.z;
+
+      return *this;
+    }
+
+    Vector3D<T>&
     operator*=(T a)
     {
       this->x *= a;
@@ -33,44 +43,53 @@ namespace AdaptiveHeadway
     }
   };
 
-    template<typename T>
-    Vector3D<T>
-    operator+(const Vector3D<T> &a, const Vector3D<T> &b)
-    {
-      Vector3D<T> result;
+  template<typename T>
+  inline void
+  zeros(Vector3D<T> &a)
+  {
+    a.x = 0;
+    a.y = 0;
+    a.z = 0;
+  }
 
-      result.x = a.x + b.x;
-      result.y = a.y + b.y;
-      result.z = a.z + b.z;
+  template<typename T>
+  Vector3D<T>
+  operator+(const Vector3D<T> &a, const Vector3D<T> &b)
+  {
+    Vector3D<T> result;
 
-      return result;
-    }
+    result.x = a.x + b.x;
+    result.y = a.y + b.y;
+    result.z = a.z + b.z;
 
-    template<typename T>
-    Vector3D<T>
-    operator-(const Vector3D<T> &a, const Vector3D<T> &b)
-    {
-      Vector3D<T> result;
+    return result;
+  }
 
-      result.x = a.x - b.x;
-      result.y = a.y - b.y;
-      result.z = a.z - b.z;
+  template<typename T>
+  Vector3D<T>
+  operator-(const Vector3D<T> &a, const Vector3D<T> &b)
+  {
+    Vector3D<T> result;
 
-      return result;
-    }
+    result.x = a.x - b.x;
+    result.y = a.y - b.y;
+    result.z = a.z - b.z;
 
-    template<typename T>
-    Vector3D<T>
-    operator*(T a, const Vector3D<T> &x)
-    {
-      Vector3D<T> result;
+    return result;
+  }
 
-      result.x = a * x.x;
-      result.y = a * x.y;
-      result.z = a * x.z;
+  template<typename A, typename B>
+  Vector3D<A>
+  operator*(A a, const Vector3D<B> &x)
+  {
+    Vector3D<A> result;
 
-      return result;
-    }
+    result.x = a * x.x;
+    result.y = a * x.y;
+    result.z = a * x.z;
+
+    return result;
+  }
   
   template<typename A, typename B>
   A dot(const Vector3D<A> &a, const Vector3D<B> &b)
