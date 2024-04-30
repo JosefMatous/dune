@@ -147,7 +147,11 @@ class Configurator(DynamicActor):
         param_pathctrl.name = 'Path Controller'
         Configurator.add_params(param_pathctrl.params, {'Minimum Hand Length':str(self.e0), 'Headway Gain':str(self.k_e)})
 
-        return (param_trajectory, param_controller, param_pathctrl)
+        param_att = imcpy.SetEntityParameters()
+        param_att.name = 'Attitude'
+        Configurator.add_params(param_att.params, {'Minimum Hand Length':str(self.e0), 'Headway Gain':str(self.k_e)})
+
+        return (param_trajectory, param_controller, param_pathctrl, param_att)
 
     @staticmethod
     def add_params(paramlist:imcpy.MessageListEntityParameter, namevaldict:dict):

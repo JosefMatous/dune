@@ -231,24 +231,13 @@ namespace AdaptiveHeadway
       double
       findEngineActuation(double f_u)
       {
-        double a = eng_params[0]*std::pow(eng_params[2], 2)/3600;
-        double b = eng_params[1]*eng_params[2]*std::fabs(m_linear_velocity[0])/60;
-        double c = f_u * (imatrix[0] + addedmass[0]) / (std::cos(eng_ori[0] - std::sin(eng_ori[1])));
+        // Find engine actuation that gives zero thrust
+        double act0 = eng_params[1] * std::fabs(m_linear_velocity[0]) * 60 / eng_params[0];
+        if (act0 >= eng_params[2])
+          return act0; // Desired acceleration is greater than what the thruster can produce
 
-        // Solve (a*x - b)*abs(x) == c
-        double det = std::pow(b, 2) + 4*a*c;
-        if (det < 0)
-          return 0.0;
-        double tmp = std::pow(2*a, -1);
-        double t1 = b * tmp;
-        double t2 = std::sqrt(det) * tmp;
-        double x;
-        if (t1 > t2)
-          x = t1 - t2;
-        else
-          x = t1 + t2;
-
-        trimValueMod(x, 0.0, 1.0);
+        // Linearize at `act0`
+        double x = act0 + (f_u * mass * eng_params[2] * eng_params[2]) / (eng_max_force * (eng_params[2] - act0));
         return x;
       }
 

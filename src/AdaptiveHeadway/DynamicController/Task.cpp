@@ -31,7 +31,7 @@
 #include <DUNE/DUNE.hpp>
 
 #include <AdaptiveHeadway/Utility.hpp>
-#include "HandTransform.hpp"
+#include "HandInput.hpp"
 
 using DUNE_NAMESPACES;
 
@@ -39,19 +39,24 @@ namespace AdaptiveHeadway
 {
   namespace DynamicController
   {
-    const uint32_t m_controllable_loops = IMC::CL_SPEED | IMC::CL_YAW | IMC::CL_PITCH | IMC::CL_ROLL;    
+    static const uint32_t c_controllable_loops = IMC::CL_YAW | IMC::CL_PITCH | IMC::CL_ROLL;    
+    static const uint32_t c_required = IMC::CL_TORQUE | IMC::CL_SPEED;
 
     struct Task: public DUNE::Tasks::Task
     {
       //! Thruster command
-      IMC::SetThrusterActuation m_thrust;
+      IMC::DesiredSpeed m_thrust;
       //! Torques
       IMC::DesiredControl m_torque;
+      //! To activate required control loops
+      IMC::ControlLoops m_requiredcl;
 
-      HandTransform m_hand;
+      HandInputTransform m_hand;
 
       //! Control loops
       uint32_t m_aloops, m_cloops, m_scope_ref;
+
+      float m_min_thrust;
 
       //! Logging
       IMC::HandLog m_log;
@@ -64,6 +69,7 @@ namespace AdaptiveHeadway
         DUNE::Tasks::Task(name, ctx),
         m_hand(ctx.config)
       {
+        bind<IMC::ControlLoops>(this);
         bind<IMC::HandPosIn>(this);
         bind<IMC::EstimatedState>(this);
 
@@ -71,10 +77,9 @@ namespace AdaptiveHeadway
         m_cloops = 0;
         m_scope_ref = 0;
 
-        m_has_input = false;
-        m_has_estate = false;
+        m_requiredcl.mask = c_required;
 
-        m_thrust.id = 0;
+        m_thrust.speed_units = IMC::SUNITS_RPM;
         m_torque.flags = IMC::DesiredControl::FL_K | IMC::DesiredControl::FL_M | IMC::DesiredControl::FL_N;
 
         param("Minimum Hand Length", m_hand.e0)
@@ -98,6 +103,13 @@ namespace AdaptiveHeadway
         param("Roll Controller D Gain", m_hand.k_d_roll)
         .minimumValue("0.0")
         .defaultValue("0.6324555320336759"); // 2*sqrt(0.1)
+
+        param("Minimum Thruster RPM", m_min_thrust)
+        .minimumValue("0.0")
+        .defaultValue("600");
+
+        reset();
+        setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_IDLE);
       }
 
       inline void
@@ -108,16 +120,16 @@ namespace AdaptiveHeadway
       }
 
       void
-      onRequestActivation(void) override
+      onRequestActivation(void)
       {
-        Task::onRequestActivation();
+        DUNE::Tasks::Task::onRequestActivation();
         reset();
       }
 
       void
-      onRequestDeactivation(void) override
+      onRequestDeactivation(void)
       {
-        Task::onRequestDeactivation();
+        DUNE::Tasks::Task::onRequestDeactivation();
         reset();
       }
 
@@ -128,11 +140,11 @@ namespace AdaptiveHeadway
         {
           m_input = *msg;
           m_has_input = true;  
-
+          /*
           if (m_has_estate)
           {
             m_hand.step(m_thrust, m_torque, m_log, m_input, m_estate);
-          }
+          }*/ // dispatch control inputs only on EstimatedState
         }
       }
 
@@ -147,6 +159,10 @@ namespace AdaptiveHeadway
           if (m_has_input)
           {
             m_hand.step(m_thrust, m_torque, m_log, m_input, m_estate);
+            trimValueMod(m_thrust.value, m_min_thrust, 2500.);
+            dispatch(m_thrust);
+            dispatch(m_torque);
+            dispatch(m_log);
           }
         }
       }
@@ -154,7 +170,7 @@ namespace AdaptiveHeadway
       void
       consume(const IMC::ControlLoops* msg)
       {
-        uint32_t loops = msg->mask & m_controllable_loops;
+        uint32_t loops = msg->mask & c_controllable_loops;
 
         if (!loops)
           return;
@@ -191,10 +207,18 @@ namespace AdaptiveHeadway
           if (msg->enable)
           {
             requestActivation();
+
+            m_requiredcl.enable = IMC::ControlLoops::CL_ENABLE;
+            m_requiredcl.scope_ref = m_scope_ref;
+            dispatch(m_requiredcl);
           }
           else
           {
             requestDeactivation();
+
+            m_requiredcl.enable = IMC::ControlLoops::CL_DISABLE;
+            m_requiredcl.scope_ref = m_scope_ref;
+            dispatch(m_requiredcl);
           }
         }
       }

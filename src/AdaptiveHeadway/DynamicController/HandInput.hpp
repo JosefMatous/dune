@@ -1,5 +1,5 @@
-#ifndef ADAPTIVE_HEADWAY_DYNAMICCONTROLLER_HANDTRANSFORM_HPP_
-#define ADAPTIVE_HEADWAY_DYNAMICCONTROLLER_HANDTRANSFORM_HPP_
+#ifndef ADAPTIVE_HEADWAY_DYNAMICCONTROLLER_HANDINPUT_HPP_
+#define ADAPTIVE_HEADWAY_DYNAMICCONTROLLER_HANDINPUT_HPP_
 
 // DUNE headers.
 #include <DUNE/DUNE.hpp>
@@ -12,7 +12,7 @@ namespace AdaptiveHeadway
 {
   namespace DynamicController
   {
-    class HandTransform
+    class HandInputTransform
     {
       public:
         //! Hand transform parameters
@@ -24,7 +24,7 @@ namespace AdaptiveHeadway
         //! Roll controller gains
         double k_p_roll, k_d_roll;
 
-        HandTransform(Parsers::Config& cfg):
+        HandInputTransform(Parsers::Config& cfg):
           m_ode(cfg)
         {
           k_e = 0.5;
@@ -35,7 +35,7 @@ namespace AdaptiveHeadway
 
         //! Performs the inverse input transformation and updates the disturbance observer
         void
-        step(IMC::SetThrusterActuation &thrust, IMC::DesiredControl &torque, IMC::HandLog &log, const IMC::HandPosIn &input, const IMC::EstimatedState &est)
+        step(IMC::DesiredSpeed &thrust, IMC::DesiredControl &torque, IMC::HandLog &log, const IMC::HandPosIn &input, const IMC::EstimatedState &est)
         {
           if (input.type != IMC::INPUT_ACCELERATION)
             return;
@@ -151,13 +151,17 @@ namespace AdaptiveHeadway
           timesR(gamma_ddot0, R, tmp); // gamma_ddot0 = R*(w x (w x e1)) + R*(w_dot0 x e1)
           Vector3D<double> x_e_ddot0 = x_ddot0 + e_ddot0*gamma + (2*e_dot)*gamma_dot + e*gamma_ddot0;
 
+          log.a_x = x_e_ddot0.x;
+          log.a_y = x_e_ddot0.y;
+          log.a_z = x_e_ddot0.z;
+
           // Inverse input transform
           double c_u = std::pow(1.0 + k_e2*dot(gamma, x_err)*einv, -1);
           Vector3D<double> mu;
           mu.x = input.u_x;
           mu.y = input.u_y;
           mu.z = input.u_z;
-          mu -= x_e_ddot0; //  output linearization
+          //mu -= x_e_ddot0; //  output linearization
           Vector3D<double> RTmu;
           timesRinv(RTmu, R, mu);
           RTmu -= m_disturbance_observer.d_hat; // disturbance compensation
