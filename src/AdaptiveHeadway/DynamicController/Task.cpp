@@ -160,6 +160,7 @@ namespace AdaptiveHeadway
           {
             m_hand.step(m_thrust, m_torque, m_log, m_input, m_estate);
             trimValueMod(m_thrust.value, m_min_thrust, 2500.);
+            spew("Thrust: %g; Torque: %g %g %g", m_thrust.value, m_torque.k, m_torque.m, m_torque.n);
             dispatch(m_thrust);
             dispatch(m_torque);
             dispatch(m_log);

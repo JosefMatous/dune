@@ -46,11 +46,10 @@ namespace AdaptiveHeadway
           // Get vehicle's orientation
           float R[9];
           rotation_matrix(R, est);
-          Vector3D<float> gamma, e1;
-          e1.x = 1.0; // e1 = [1;0;0]
-          e1.y = 0.0;
-          e1.z = 0.0;
-          timesR(gamma, R, e1); // gamma = R * [1;0;0]
+          Vector3D<float> gamma;
+          gamma.x = R[0];
+          gamma.y = R[1];
+          gamma.z = R[2];// gamma = R * [1;0;0]
 
           // Hand transform
           Vector3D<double> x_err; // position error
@@ -58,7 +57,7 @@ namespace AdaptiveHeadway
           x_err.y = est.y;
           x_err.z = est.depth;
 
-          const IMC::TrajectoryReference *traj = (input.reference.isNull()) ? input.reference.get() : nullptr;
+          const IMC::TrajectoryReference *traj = (input.reference.isNull()) ? nullptr : input.reference.get();
           if (traj)
           {
             x_err.x -= traj->r_x;
@@ -161,7 +160,7 @@ namespace AdaptiveHeadway
           mu.x = input.u_x;
           mu.y = input.u_y;
           mu.z = input.u_z;
-          //mu -= x_e_ddot0; //  output linearization
+          mu -= x_e_ddot0; //  output linearization
           Vector3D<double> RTmu;
           timesRinv(RTmu, R, mu);
           RTmu -= m_disturbance_observer.d_hat; // disturbance compensation

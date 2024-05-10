@@ -231,14 +231,24 @@ namespace AdaptiveHeadway
       double
       findEngineActuation(double f_u)
       {
-        // Find engine actuation that gives zero thrust
-        double act0 = eng_params[1] * std::fabs(m_linear_velocity[0]) * 60 / eng_params[0];
-        if (act0 >= eng_params[2])
-          return act0; // Desired acceleration is greater than what the thruster can produce
+        // Solve quadratic equation
+        //    a*rpm^2 - b*rpm = c,
+        // where
+        //    a = eng_params[0] / 60^2
+        //    b = eng_params[1] * speed / 60
+        //    c = f_u * mass
+        // subject to rpm > 0
+        
+        double a = eng_params[0] * 2.77777777777777777777777777777777777777778e-04; // 1/3600 = 2.77777...e-4
+        double b = eng_params[1] * std::fabs(m_linear_velocity[0]) * 0.016666666666666666666666666666666666666666666666667; // 1/60 = 0.01666...
+        double c = f_u * imatrix[0];
+        if (c < 0.)
+          c = 0.;
+        else if (c > eng_max_force) // the desired force is greater than what the thruster can produce -- return max RPM
+          return eng_params[2];
 
-        // Linearize at `act0`
-        double x = act0 + (f_u * mass * eng_params[2] * eng_params[2]) / (eng_max_force * (eng_params[2] - act0));
-        return x;
+        double det = std::pow(b, 2.0) + 4*a*c;
+        return (b + det) / (2*a);
       }
 
       //! Calculates the roll, pitch, and yaw torques that produce the desired accelerations
