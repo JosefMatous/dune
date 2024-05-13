@@ -108,6 +108,20 @@ namespace AdaptiveHeadway
         .minimumValue("0.0")
         .defaultValue("600");
 
+        param("Output Linearization Method", m_hand.mode)
+        .description("Method used to calculate the hand dynamics (0 = full nonlinear ODE, 1 = simplified linear model)")
+        .defaultValue("1");
+
+        param("Linear Model Damping", m_hand.k_damping)
+        .minimumValue("0.0")
+        .defaultValue("0.03");
+
+        param("Observer -- Use Saturated Input", m_hand.observer_use_saturation)
+        .defaultValue("false");
+        
+        param("Observer -- Input Saturation", m_hand.observer_saturation)
+        .defaultValue("1.0");
+
         reset();
         setEntityState(IMC::EntityState::ESTA_NORMAL, Status::CODE_IDLE);
       }

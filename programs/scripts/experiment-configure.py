@@ -139,19 +139,20 @@ class Configurator(DynamicActor):
         param_trajectory.name = 'Reference Trajectory'
         Configurator.add_params(param_trajectory.params, self.trajectory.get_paramdict())
 
-        param_controller = imcpy.SetEntityParameters()
-        param_controller.name = 'Trajectory Controller'
-        Configurator.add_params(param_controller.params, {'Minimum Hand Length':str(self.e0), 'Headway Gain':str(self.k_e), 'Experiment Stop Time':str(self.trajectory.get_stoptime())})
+        #param_controller = imcpy.SetEntityParameters()
+        #param_controller.name = 'Trajectory Controller'
+        #Configurator.add_params(param_controller.params, {'Minimum Hand Length':str(self.e0), 'Headway Gain':str(self.k_e), 'Experiment Stop Time':str(self.trajectory.get_stoptime())})
 
         param_pathctrl = imcpy.SetEntityParameters()
-        param_pathctrl.name = 'Path Controller'
-        Configurator.add_params(param_pathctrl.params, {'Minimum Hand Length':str(self.e0), 'Headway Gain':str(self.k_e)})
+        param_pathctrl.name = 'Path Control'
+        Configurator.add_params(param_pathctrl.params, {'Minimum Hand Length':str(self.e0), 'Headway Gain':str(self.k_e), 'Experiment Stop Time':str(self.trajectory.get_stoptime())})
 
         param_att = imcpy.SetEntityParameters()
         param_att.name = 'Attitude'
         Configurator.add_params(param_att.params, {'Minimum Hand Length':str(self.e0), 'Headway Gain':str(self.k_e)})
 
-        return (param_trajectory, param_controller, param_pathctrl, param_att)
+        #return (param_trajectory, param_controller, param_pathctrl, param_att)
+        return (param_trajectory, param_pathctrl, param_att)
 
     @staticmethod
     def add_params(paramlist:imcpy.MessageListEntityParameter, namevaldict:dict):
@@ -201,11 +202,16 @@ def query_value(prompt:str, v_default:float):
         v = v_default
     return v
 
+def query_string(prompt:str, v_default:str):
+    print('{} (default {})'.format(prompt, v_default))
+    v = input()
+    if len(v) == 0:
+        v = v_default
+    return v
+
 if __name__ == "__main__":
-    print('Vehicle name:')
-    veh = input()
-    print('Plan name:')
-    plan = input()
+    veh = query_string('Vehicle name', 'lauv-simulator-1')
+    plan = query_string('Plan name', 'figure-eight')
 
     print('')
     print('Controller parameters:')

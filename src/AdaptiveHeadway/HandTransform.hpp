@@ -8,7 +8,7 @@ namespace AdaptiveHeadway
 {
   using DUNE_NAMESPACES;
 
-  void
+  inline void
   hand_transform(Vector3D<double> &x_hand, Vector3D<double> &v_hand, const IMC::EstimatedState &state, const Vector3D<double> &x_ref, const Vector3D<double> &v_ref, double k_e, double e0)
   {
     // Get vehicle's orientation

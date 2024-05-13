@@ -244,10 +244,8 @@ namespace AdaptiveHeadway
         double c = f_u * imatrix[0];
         if (c < 0.)
           c = 0.;
-        else if (c > eng_max_force) // the desired force is greater than what the thruster can produce -- return max RPM
-          return eng_params[2];
 
-        double det = std::pow(b, 2.0) + 4*a*c;
+        double det = std::sqrt(std::pow(b, 2.0) + 4*a*c);
         return (b + det) / (2*a);
       }
 

@@ -37,9 +37,9 @@ namespace AdaptiveHeadway
 {
   //! Second-order trajectory-tracking controller.
   //!
-  //! A trajectory-tracking PD controller based on the hand position concept.
+  //! A saturated trajectory-tracking PD controller based on the hand position concept.
   //! @author Josef Matous
-  namespace TrajectoryControllerSO
+  namespace TrajectoryControllerSOSaturated
   {
     using DUNE_NAMESPACES;
 
@@ -57,7 +57,8 @@ namespace AdaptiveHeadway
       IMC::ExperimentControl m_stop_experiment;
 
       struct{
-        double k_p_horz, k_p_vert, k_d_horz, k_d_vert, e0, k_e;
+        double k_p_horz, k_p_vert, k_d_horz, k_d_vert, v_max, e0, k_e;
+        double sigma_horz, sigma_vert, c_horz, c_vert;
       } m_params;
 
       //! Constructor.
@@ -93,6 +94,10 @@ namespace AdaptiveHeadway
         .minimumValue("0.0")
         .defaultValue("0.6324555320336759");
 
+        param("Maximum Speed", m_params.v_max)
+        .minimumValue("0.0")
+        .defaultValue("0.4");
+
         param("Minimum Hand Length", m_params.e0)
         .units(Units::Meter)
         .minimumValue("0.0")
@@ -123,7 +128,6 @@ namespace AdaptiveHeadway
           if (new_active != m_active)
           {
             m_active = new_active;
-            debug("Active state changed to %d", m_active);
             if (m_active)
               m_T_start = Clock::get();
             else
@@ -137,6 +141,21 @@ namespace AdaptiveHeadway
       {
         m_control_input.reference.set(*msg);
         m_has_trajectory = true;
+      }
+
+      void
+      onUpdateParameters(void)
+      {
+        if (paramChanged(m_params.k_p_horz) || paramChanged(m_params.k_d_horz) || paramChanged(m_params.v_max))
+        {
+          m_params.sigma_horz = m_params.k_d_horz * m_params.v_max;
+          m_params.c_horz = m_params.k_p_horz / m_params.sigma_horz;
+        }
+        if (paramChanged(m_params.k_p_vert) || paramChanged(m_params.k_d_vert) || paramChanged(m_params.v_max))
+        {
+          m_params.sigma_vert = m_params.k_d_vert * m_params.v_max;
+          m_params.c_vert = m_params.k_p_vert / m_params.sigma_vert;
+        }
       }
 
       inline bool
@@ -205,16 +224,29 @@ namespace AdaptiveHeadway
 
         hand_transform(x_hand, v_hand, state, x_ref, v_ref, m_params.k_e, m_params.e0);
 
-        m_control_input.u_x = m_params.k_p_horz*(x_ref.x - x_hand.x) + m_params.k_d_horz*(v_ref.x - v_hand.x) + a_ref.x;
-        m_control_input.u_y = m_params.k_p_horz*(x_ref.y - x_hand.y) + m_params.k_d_horz*(v_ref.y - v_hand.y) + a_ref.y;
-        m_control_input.u_z = m_params.k_p_vert*(x_ref.z - x_hand.z) + m_params.k_d_vert*(v_ref.z - v_hand.z) + a_ref.z;
+        // Trajectory control
+        // control law: u = sigma * sat(c*(x_ref - x)) + k_d * (v_ref - v) + a_ref
+        //
+        Vector3D<double> x_err = x_ref - x_hand;
+        spew("Position error: %.2f, %.2f, %.2f", x_err.x, x_err.y, x_err.z);
+        x_err.x *= m_params.c_horz;
+        x_err.y *= m_params.c_horz;
+        x_err.z *= m_params.c_vert;
+        double satfunc = std::pow(1.0 + dot(x_err, x_err), -0.5); // sat(x) = x / sqrt(1 + x^2)
+        x_err.x *= m_params.sigma_horz * satfunc;
+        x_err.y *= m_params.sigma_horz * satfunc;
+        x_err.z *= m_params.sigma_vert * satfunc;
+        spew("Saturated control law: %.2f, %.2f, %.2f", x_err.x, x_err.y, x_err.z);
+
+        m_control_input.u_x = x_err.x + m_params.k_d_horz*(v_ref.x - v_hand.x) + a_ref.x;
+        m_control_input.u_y = x_err.y + m_params.k_d_horz*(v_ref.y - v_hand.y) + a_ref.y;
+        m_control_input.u_z = x_err.z + m_params.k_d_vert*(v_ref.z - v_hand.z) + a_ref.z;
         dispatch(m_control_input);
 
         // Check for termination
         if (m_active && m_T_stop > 0.)
         {
           double t = Clock::get() - m_T_start;
-          spew("Checking for termination (t = %.2f)", t);
           if (t >= m_T_stop)
           {
             debug("Reached experiment stop time, terminating ...");

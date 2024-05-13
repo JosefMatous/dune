@@ -12,6 +12,12 @@ namespace AdaptiveHeadway
 {
   namespace DynamicController
   {
+    const uint8_t MODE_FULL_ODE = 0;
+    const uint8_t MODE_LINEAR_DAMPER = 1;
+
+    //! Floating-point zero tolerance
+    const double c_eps = 1e-4;
+
     class HandInputTransform
     {
       public:
@@ -24,12 +30,28 @@ namespace AdaptiveHeadway
         //! Roll controller gains
         double k_p_roll, k_d_roll;
 
+        //! Output linearization mode
+        uint8_t mode;
+
+        //! Gain of the linear damper model
+        double k_damping;
+
+        //! Use saturated input in disturbance observer
+        bool observer_use_saturation;
+
+        //! Saturation limit in the disturbance observer
+        double observer_saturation;
+
         HandInputTransform(Parsers::Config& cfg):
           m_ode(cfg)
         {
           k_e = 0.5;
           e0 = 1.0;
           wn = 1.0;
+          mode = MODE_LINEAR_DAMPER;
+          k_damping = 0.03;
+          observer_use_saturation = false;
+          observer_saturation = 1.0;
           m_disturbance_observer.is_initialized = false;
         }
 
@@ -86,7 +108,8 @@ namespace AdaptiveHeadway
           omega_e1.y = est.r;
           omega_e1.z = -est.q;
           timesR(gamma_dot, R, omega_e1); // gamma_dot = R * (omega x [1;0;0])
-          double e_dot = k_e2*dot(x_err_dot, x_err) / e;
+          double einv = std::pow(e, -1);
+          double e_dot = k_e2*dot(x_err_dot, x_err) * einv;
 
           log.v_x = est.vx + e_dot*gamma.x + e*gamma_dot.x; // Hand velocity x_hand_dot = x_dot + e_dot*gamma + e*gamma_dot
           log.v_y = est.vy + e_dot*gamma.y + e*gamma_dot.y;
@@ -121,34 +144,51 @@ namespace AdaptiveHeadway
           log.d_z = m_disturbance_observer.d_hat.z;
 
           // Hand transform -- zero-input second derivative
-          Vector3D<double> v, w;
-          v.x = est.u;
-          v.y = est.v;
-          v.z = est.w;
-          w.x = est.p;
-          w.y = est.q;
-          w.z = est.r;
-          Vector3D<double> v_dot0, w_dot0;
-          m_ode.vehicleODE(v_dot0, w_dot0);
-          Vector3D<double> x_ddot0, x_err_ddot0, tmp;
-          cross(tmp, w, v);
-          tmp += v_dot0;
-          timesR(x_ddot0, R, tmp); // x_ddot0 = R*(cross(w, v) + v_dot0)
-          x_err_ddot0 = x_ddot0; // x_err_ddot0 = x_ddot0 - traj.a
-          if (traj)
+          Vector3D<double> x_e_ddot0;
+          switch (mode)
           {
-            x_err_ddot0.x -= traj->a_x;
-            x_err_ddot0.y -= traj->a_y;
-            x_err_ddot0.z -= traj->a_z;
+            case MODE_FULL_ODE:
+            {
+              Vector3D<double> v, w;
+              v.x = est.u;
+              v.y = est.v;
+              v.z = est.w;
+              w.x = est.p;
+              w.y = est.q;
+              w.z = est.r;
+              Vector3D<double> v_dot0, w_dot0;
+              m_ode.vehicleODE(v_dot0, w_dot0);
+              Vector3D<double> x_ddot0, x_err_ddot0, tmp;
+              cross(tmp, w, v);
+              tmp += v_dot0;
+              timesR(x_ddot0, R, tmp); // x_ddot0 = R*(cross(w, v) + v_dot0)
+              x_err_ddot0 = x_ddot0; // x_err_ddot0 = x_ddot0 - traj.a
+              if (traj)
+              {
+                x_err_ddot0.x -= traj->a_x;
+                x_err_ddot0.y -= traj->a_y;
+                x_err_ddot0.z -= traj->a_z;
+              }
+              double e_ddot0 = k_e2*(dot(x_err_ddot0, x_err) + dot(x_err_dot, x_err_dot))*einv - std::pow(e_dot, 2)*einv;
+              Vector3D<double> gamma_ddot0;
+              cross(tmp, w, omega_e1);
+              tmp.y += w_dot0.z;
+              tmp.z -= w_dot0.y;
+              timesR(gamma_ddot0, R, tmp); // gamma_ddot0 = R*(w x (w x e1)) + R*(w_dot0 x e1)
+              x_e_ddot0 = x_ddot0 + e_ddot0*gamma + (2*e_dot)*gamma_dot + e*gamma_ddot0;
+            }
+            break;
+          
+          case MODE_LINEAR_DAMPER: // simplified linear damper model
+              x_e_ddot0.x = - k_damping * log.v_x;
+              x_e_ddot0.y = - k_damping * log.v_y;
+              x_e_ddot0.z = - k_damping * log.v_z;
+              break;
+
+            default:
+              zeros(x_e_ddot0);
+              break;
           }
-          double einv = std::pow(e, -1);
-          double e_ddot0 = k_e2*(dot(x_err_ddot0, x_err) + dot(x_err_dot, x_err_dot))*einv - std::pow(e_dot, 2)*einv;
-          Vector3D<double> gamma_ddot0;
-          cross(tmp, w, omega_e1);
-          tmp.y += w_dot0.z;
-          tmp.z -= w_dot0.y;
-          timesR(gamma_ddot0, R, tmp); // gamma_ddot0 = R*(w x (w x e1)) + R*(w_dot0 x e1)
-          Vector3D<double> x_e_ddot0 = x_ddot0 + e_ddot0*gamma + (2*e_dot)*gamma_dot + e*gamma_ddot0;
 
           log.a_x = x_e_ddot0.x;
           log.a_y = x_e_ddot0.y;
@@ -221,6 +261,14 @@ namespace AdaptiveHeadway
           mu.x = input->u_x;
           mu.y = input->u_y;
           mu.z = input->u_z;
+          if (observer_use_saturation)
+          {
+            double mu_norm = norm(mu);
+            if (mu_norm > c_eps)
+            {
+              mu *= observer_saturation * std::tanh(mu_norm / observer_saturation);
+            }
+          }
 
           Vector3D<double> x_hat_new, v_hat_new, tmp;
           timesR(tmp, R, m_disturbance_observer.d_hat);
